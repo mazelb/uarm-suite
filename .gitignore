@@ -1,0 +1,26 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Tool caches
+.pytest_cache/
+.ruff_cache/
+.hypothesis/
+
+# Editor / IDE / session state
+.vscode/
+.idea/
+.claude/
+
+# Reference material (uArm Studio dump, datasheets) — kept out of git, big.
+references/
+
+# Recorded teach-mode sessions (Phase 2+)
+recordings/
