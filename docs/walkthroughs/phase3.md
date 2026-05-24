@@ -102,13 +102,12 @@ uv run uarm goto 250 0 50
 
 ```
 Reached (250.0, 0.0, 50.0)
-Joints: j0=0.00 j1=54.46 j2=-67.11 j3=0.00
+Joints: j0=0.00 j1=43.97 j2=-54.48 j3=0.00
 ```
 
 **Expected in the browser:** the 3D arm animates smoothly from the home
-pose to the new position. The upper arm tilts higher and the forearm
-angles further down. The info overlay updates in real time to show the
-final joint angles and position.
+pose to the new position. The info overlay updates in real time to show
+the final joint angles and position.
 
 ## 6. Home from the second terminal
 
@@ -116,7 +115,7 @@ final joint angles and position.
 uv run uarm home
 ```
 
-**Expected CLI output:**
+**Expected CLI output (values may vary by ~0.5 deg due to sim timing):**
 
 ```
 Homed to (268.1, 0.0, 68.7)
@@ -136,7 +135,7 @@ uv run uarm goto 250 100 50
 
 ```
 Reached (250.0, 100.0, 50.0)
-Joints: j0=21.80 j1=53.25 j2=-65.91 j3=0.00
+Joints: j0=21.80 j1=39.16 j2=-49.24 j3=0.00
 ```
 
 **Expected in the browser:** the arm rotates toward the viewer (positive
