@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>uArm Swift — 3D Visualizer</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div id="info">
+        <div class="title">uArm Swift</div>
+        <div>j0: <span id="v-j0">0.00</span>&deg;</div>
+        <div>j1: <span id="v-j1">0.00</span>&deg;</div>
+        <div>j2: <span id="v-j2">0.00</span>&deg;</div>
+        <div>j3: <span id="v-j3">0.00</span>&deg;</div>
+        <hr>
+        <div>x: <span id="v-x">0.0</span> mm</div>
+        <div>y: <span id="v-y">0.0</span> mm</div>
+        <div>z: <span id="v-z">0.0</span> mm</div>
+        <hr>
+        <div id="status">Connecting&hellip;</div>
+    </div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.162.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.162.0/examples/jsm/"
+        }
+    }
+    </script>
+    <script type="module" src="/viz.js"></script>
+</body>
+</html>

@@ -185,3 +185,28 @@ def test_shell_launches() -> None:
         mock_code.interact.assert_called_once()
         call_kwargs = mock_code.interact.call_args
         assert "arm" in call_kwargs.kwargs.get("local", call_kwargs[1].get("local", {}))
+
+
+# ------------------------------------------------------------------
+# server detection
+# ------------------------------------------------------------------
+
+
+def test_where_uses_server_when_available() -> None:
+    with (
+        patch("cli._server_running", return_value=True),
+        patch("cli._get_json") as mock_get,
+    ):
+        mock_get.return_value = {
+            "j0": 0.0,
+            "j1": 45.0,
+            "j2": -45.0,
+            "j3": 0.0,
+            "x": 268.1,
+            "y": 0.0,
+            "z": 68.7,
+        }
+        result = runner.invoke(app, ["where"])
+        assert result.exit_code == 0
+        assert "268.1" in result.stdout
+        mock_get.assert_called_once_with("/api/state")
