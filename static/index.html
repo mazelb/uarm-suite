@@ -74,6 +74,12 @@
                 <button id="goto-btn" class="action-btn">Go</button>
             </div>
 
+            <!-- Workspace toggle -->
+            <div class="section">
+                <div class="section-title">Workspace</div>
+                <button id="ws-toggle" class="action-btn">Hide Workspace</button>
+            </div>
+
             <!-- Teach / replay -->
             <div class="section">
                 <div class="section-title">Teach</div>
@@ -85,6 +91,83 @@
                 <div id="rec-list" class="rec-list"><em>none</em></div>
                 <div class="teach-row" style="margin-top:4px">
                     <label>Speed <input type="number" id="replay-speed" value="1.0" min="0.1" max="5" step="0.1"></label>
+                </div>
+            </div>
+            <!-- Calibration wizard -->
+            <div class="section">
+                <div class="section-title">Calibration</div>
+                <div class="cal-table">
+                    <div class="cal-header">
+                        <span>Ch</span><span>Zero&deg;</span><span>Dir</span><span>Min&micro;s</span><span>Max&micro;s</span><span></span>
+                    </div>
+                    <div class="cal-row" id="cal-row-0">
+                        <span class="cal-label">J0</span>
+                        <input type="number" id="cal-zero-0" value="90" step="0.5" class="cal-input">
+                        <select id="cal-dir-0" class="cal-input"><option value="1">+1</option><option value="-1">-1</option></select>
+                        <input type="number" id="cal-min-0" value="500" step="10" class="cal-input">
+                        <input type="number" id="cal-max-0" value="2500" step="10" class="cal-input">
+                        <button id="cal-apply-0" class="cal-btn" title="Apply">&#10003;</button>
+                    </div>
+                    <div class="cal-row" id="cal-row-1">
+                        <span class="cal-label">J1</span>
+                        <input type="number" id="cal-zero-1" value="90" step="0.5" class="cal-input">
+                        <select id="cal-dir-1" class="cal-input"><option value="1">+1</option><option value="-1">-1</option></select>
+                        <input type="number" id="cal-min-1" value="500" step="10" class="cal-input">
+                        <input type="number" id="cal-max-1" value="2500" step="10" class="cal-input">
+                        <button id="cal-apply-1" class="cal-btn" title="Apply">&#10003;</button>
+                    </div>
+                    <div class="cal-row" id="cal-row-2">
+                        <span class="cal-label">J2</span>
+                        <input type="number" id="cal-zero-2" value="90" step="0.5" class="cal-input">
+                        <select id="cal-dir-2" class="cal-input"><option value="1">+1</option><option value="-1">-1</option></select>
+                        <input type="number" id="cal-min-2" value="500" step="10" class="cal-input">
+                        <input type="number" id="cal-max-2" value="2500" step="10" class="cal-input">
+                        <button id="cal-apply-2" class="cal-btn" title="Apply">&#10003;</button>
+                    </div>
+                    <div class="cal-row" id="cal-row-3">
+                        <span class="cal-label">J3</span>
+                        <input type="number" id="cal-zero-3" value="90" step="0.5" class="cal-input">
+                        <select id="cal-dir-3" class="cal-input"><option value="1">+1</option><option value="-1">-1</option></select>
+                        <input type="number" id="cal-min-3" value="500" step="10" class="cal-input">
+                        <input type="number" id="cal-max-3" value="2500" step="10" class="cal-input">
+                        <button id="cal-apply-3" class="cal-btn" title="Apply">&#10003;</button>
+                    </div>
+                </div>
+                <div class="cal-test-row">
+                    <span class="cal-label">Test:</span>
+                    <div class="cal-test-btns">
+                        <button id="cal-test0-0" class="cal-sm-btn">J0@0&deg;</button>
+                        <button id="cal-test45-0" class="cal-sm-btn">+45&deg;</button>
+                        <button id="cal-testn45-0" class="cal-sm-btn">-45&deg;</button>
+                    </div>
+                </div>
+                <div class="cal-test-row">
+                    <span class="cal-label">&nbsp;</span>
+                    <div class="cal-test-btns">
+                        <button id="cal-test0-1" class="cal-sm-btn">J1@0&deg;</button>
+                        <button id="cal-test45-1" class="cal-sm-btn">+45&deg;</button>
+                        <button id="cal-testn45-1" class="cal-sm-btn">-45&deg;</button>
+                    </div>
+                </div>
+                <div class="cal-test-row">
+                    <span class="cal-label">&nbsp;</span>
+                    <div class="cal-test-btns">
+                        <button id="cal-test0-2" class="cal-sm-btn">J2@0&deg;</button>
+                        <button id="cal-test45-2" class="cal-sm-btn">+45&deg;</button>
+                        <button id="cal-testn45-2" class="cal-sm-btn">-45&deg;</button>
+                    </div>
+                </div>
+                <div class="cal-test-row">
+                    <span class="cal-label">&nbsp;</span>
+                    <div class="cal-test-btns">
+                        <button id="cal-test0-3" class="cal-sm-btn">J3@0&deg;</button>
+                        <button id="cal-test45-3" class="cal-sm-btn">+45&deg;</button>
+                        <button id="cal-testn45-3" class="cal-sm-btn">-45&deg;</button>
+                    </div>
+                </div>
+                <div class="cal-actions">
+                    <button id="cal-save" class="action-btn">Save to disk</button>
+                    <button id="cal-reset" class="cal-sm-btn" style="margin-top:4px;width:100%">Reset defaults</button>
                 </div>
             </div>
         </div>

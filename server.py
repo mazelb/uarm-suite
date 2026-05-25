@@ -7,6 +7,7 @@ WebSocket streams joint state at ~50 Hz for the 3D visualization.
 from __future__ import annotations
 
 import asyncio
+import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,7 +18,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from arm import RECORDINGS_DIR, UArm
-from config import SIM_UPDATE_HZ
+from config import (
+    SERVO_CALIBRATION,
+    SIM_UPDATE_HZ,
+    ServoCalibration,
+)
 from kinematics import (
     JointAngles,
     JointLimitError,
@@ -27,11 +32,30 @@ from kinematics import (
 
 _arm: UArm | None = None
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
+CALIBRATION_PATH = Path("calibration.json")
+
+
+def _load_calibration() -> None:
+    """Load calibration.json (if it exists) into SERVO_CALIBRATION in place."""
+    if not CALIBRATION_PATH.exists():
+        return
+    data = json.loads(CALIBRATION_PATH.read_text())
+    for ch_str, cal in data.items():
+        ch = int(ch_str)
+        if ch in SERVO_CALIBRATION:
+            SERVO_CALIBRATION[ch].update(cal)
+
+
+def _save_calibration() -> None:
+    """Persist SERVO_CALIBRATION to calibration.json."""
+    data = {str(ch): dict(cal) for ch, cal in SERVO_CALIBRATION.items()}
+    CALIBRATION_PATH.write_text(json.dumps(data, indent=2))
 
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _arm
+    _load_calibration()
     if _arm is None:
         _arm = UArm()
         _arm.connect()
@@ -73,6 +97,14 @@ class RecordStartCommand(BaseModel):
 class PlayCommand(BaseModel):
     name: str
     speed_factor: float = 1.0
+
+
+class CalibrationUpdate(BaseModel):
+    channel: int
+    min_us: int | None = None
+    max_us: int | None = None
+    zero_deg: float | None = None
+    direction: int | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -195,6 +227,52 @@ async def api_play(cmd: PlayCommand):
     except FileNotFoundError:
         return JSONResponse(status_code=404, content={"error": f"Recording '{cmd.name}' not found"})
     return _state_dict()
+
+
+# ---------------------------------------------------------------------------
+# Calibration endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/calibration")
+async def api_calibration() -> dict:
+    return {str(ch): dict(cal) for ch, cal in SERVO_CALIBRATION.items()}
+
+
+@app.post("/api/calibration")
+async def api_calibration_update(cmd: CalibrationUpdate):
+    if cmd.channel not in SERVO_CALIBRATION:
+        return JSONResponse(status_code=422, content={"error": f"Unknown channel {cmd.channel}"})
+    cal: ServoCalibration = SERVO_CALIBRATION[cmd.channel]
+    if cmd.min_us is not None:
+        cal["min_us"] = cmd.min_us
+    if cmd.max_us is not None:
+        cal["max_us"] = cmd.max_us
+    if cmd.zero_deg is not None:
+        cal["zero_deg"] = cmd.zero_deg
+    if cmd.direction is not None:
+        if cmd.direction not in (1, -1):
+            return JSONResponse(status_code=422, content={"error": "direction must be +1 or -1"})
+        cal["direction"] = cmd.direction
+    return {str(ch): dict(c) for ch, c in SERVO_CALIBRATION.items()}
+
+
+@app.post("/api/calibration/save")
+async def api_calibration_save():
+    _save_calibration()
+    return {"status": "saved", "path": str(CALIBRATION_PATH)}
+
+
+@app.post("/api/calibration/reset")
+async def api_calibration_reset():
+    for ch in SERVO_CALIBRATION:
+        SERVO_CALIBRATION[ch] = ServoCalibration(
+            min_us=500,
+            max_us=2500,
+            zero_deg=90.0,
+            direction=1,
+        )
+    return {str(ch): dict(cal) for ch, cal in SERVO_CALIBRATION.items()}
 
 
 # ---------------------------------------------------------------------------

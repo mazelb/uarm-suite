@@ -3,6 +3,18 @@ const API = "";
 let latestState = { j0: 0, j1: 45, j2: -45, j3: 0, x: 0, y: 0, z: 0, recording: false };
 let activeSlider = null;
 
+// ── Joint limits (mirrors config.py) ────────────────────────────────
+
+const JOINT_LIMITS = {
+    j0: [-90, 90],
+    j1: [0, 135],
+    j2: [-135, 90],
+    j3: [-90, 90],
+};
+const WARN_DEG = 10;
+const DANGER_DEG = 5;
+const paraFloor = (j1) => 2 * j1 - 180;
+
 // ── Toast notifications ─────────────────────────────────────────────
 
 function showToast(msg, type = "error", duration = 4000) {
@@ -62,6 +74,50 @@ function syncSliders() {
             sl.value = latestState[name];
             valEl.textContent = latestState[name].toFixed(1);
         }
+    }
+    checkSoftLimits();
+}
+
+// ── Soft-limit checks ───────────────────────────────────────────────
+
+let _lastLimitToast = 0;
+const LIMIT_TOAST_COOLDOWN_MS = 3000;
+
+function checkSoftLimits() {
+    for (const name of sliders) {
+        const val = latestState[name];
+        const [lo, hi] = JOINT_LIMITS[name];
+        const sl = document.getElementById(`sl-${name}`);
+        const distLo = val - lo;
+        const distHi = hi - val;
+        const minDist = Math.min(distLo, distHi);
+
+        sl.classList.remove("limit-warn", "limit-danger");
+        if (minDist <= DANGER_DEG) {
+            sl.classList.add("limit-danger");
+        } else if (minDist <= WARN_DEG) {
+            sl.classList.add("limit-warn");
+        }
+    }
+
+    // Parallelogram coupled constraint: j2 > 2*j1 - 180
+    const floor = paraFloor(latestState.j1);
+    const paraMargin = latestState.j2 - floor;
+    const paraEl = document.getElementById("sl-j2");
+    if (paraMargin <= DANGER_DEG && paraMargin > 0) {
+        paraEl.classList.add("limit-danger");
+        _maybeToast(`Parallelogram constraint: j2 within ${paraMargin.toFixed(1)}° of limit`);
+    } else if (paraMargin <= WARN_DEG && paraMargin > 0) {
+        if (!paraEl.classList.contains("limit-danger"))
+            paraEl.classList.add("limit-warn");
+    }
+}
+
+function _maybeToast(msg) {
+    const now = Date.now();
+    if (now - _lastLimitToast > LIMIT_TOAST_COOLDOWN_MS) {
+        _lastLimitToast = now;
+        showToast(msg, "warning", 3000);
     }
 }
 
@@ -220,7 +276,73 @@ document.getElementById("toggle-controls").addEventListener("click", () => {
     btn.textContent = panel.classList.contains("collapsed") ? "›" : "‹";
 });
 
+// ── Workspace toggle ────────────────────────────────────────────────
+
+document.getElementById("ws-toggle").addEventListener("click", () => {
+    const btn = document.getElementById("ws-toggle");
+    if (typeof window.toggleWorkspace === "function") {
+        window.toggleWorkspace();
+        btn.textContent = window._workspaceVisible ? "Hide Workspace" : "Show Workspace";
+    }
+});
+
+// ── Calibration wizard ──────────────────────────────────────────────
+
+const CAL_CHANNELS = [0, 1, 2, 3];
+const CAL_NAMES = ["J0", "J1", "J2", "J3"];
+
+async function loadCalibration() {
+    const data = await apiGet("/api/calibration");
+    if (!data) return;
+    for (const ch of CAL_CHANNELS) {
+        const cal = data[String(ch)];
+        if (!cal) continue;
+        document.getElementById(`cal-zero-${ch}`).value = cal.zero_deg;
+        document.getElementById(`cal-dir-${ch}`).value = cal.direction;
+        document.getElementById(`cal-min-${ch}`).value = cal.min_us;
+        document.getElementById(`cal-max-${ch}`).value = cal.max_us;
+    }
+}
+
+async function updateCalibration(channel) {
+    const zero_deg = parseFloat(document.getElementById(`cal-zero-${channel}`).value);
+    const direction = parseInt(document.getElementById(`cal-dir-${channel}`).value, 10);
+    const min_us = parseInt(document.getElementById(`cal-min-${channel}`).value, 10);
+    const max_us = parseInt(document.getElementById(`cal-max-${channel}`).value, 10);
+    if ([zero_deg, direction, min_us, max_us].some(isNaN)) {
+        showToast("Invalid calibration value");
+        return;
+    }
+    await apiPost("/api/calibration", { channel, zero_deg, direction, min_us, max_us });
+    showToast(`Ch ${channel} calibration updated`, "info", 2000);
+}
+
+async function testJoint(channel, angle) {
+    const cmd = { j0: latestState.j0, j1: latestState.j1, j2: latestState.j2, j3: latestState.j3 };
+    cmd[`j${channel}`] = angle;
+    await apiPost("/api/joints", cmd);
+}
+
+for (const ch of CAL_CHANNELS) {
+    document.getElementById(`cal-apply-${ch}`).addEventListener("click", () => updateCalibration(ch));
+    document.getElementById(`cal-test0-${ch}`).addEventListener("click", () => testJoint(ch, 0));
+    document.getElementById(`cal-test45-${ch}`).addEventListener("click", () => testJoint(ch, 45));
+    document.getElementById(`cal-testn45-${ch}`).addEventListener("click", () => testJoint(ch, -45));
+}
+
+document.getElementById("cal-save").addEventListener("click", async () => {
+    await apiPost("/api/calibration/save");
+    showToast("Calibration saved to disk", "success", 2000);
+});
+
+document.getElementById("cal-reset").addEventListener("click", async () => {
+    await apiPost("/api/calibration/reset");
+    await loadCalibration();
+    showToast("Calibration reset to defaults", "info", 2000);
+});
+
 // ── Init ────────────────────────────────────────────────────────────
 
 connectControlWs();
 refreshRecordings();
+loadCalibration();

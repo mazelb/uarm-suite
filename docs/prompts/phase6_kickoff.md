@@ -97,3 +97,6 @@ viz, soft-limit toasts."
 - Calibration wizard must work in both sim and hardware modes
 - No npm/build step — keep vanilla JS
 - Don't touch hardware without explicit go-ahead
+
+1 extra tasks not present in the original claude.md file: 
+- this project started as a fun project with my kid to create a tic-tac-toe game with the uarm swift i have. now that the app to control the arm is complete, help me add a tic-tac-toe simulation and the hardware control so I can play with that. Plan it so we can add more scripts for different games or activities using the uarm seamlessly. Only create a prompt for a stretch phase 7 do not execute it

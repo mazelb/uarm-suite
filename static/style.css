@@ -400,3 +400,136 @@ canvas {
     from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
 }
+
+.toast.warning {
+    border-color: #ffa726;
+    color: #ffa726;
+}
+
+/* ── Soft-limit slider colors ───────────────────────────────────────── */
+
+input[type="range"].limit-warn {
+    background: linear-gradient(90deg, #333 0%, #665500 100%);
+}
+
+input[type="range"].limit-warn::-webkit-slider-thumb {
+    background: #ffa726;
+}
+
+input[type="range"].limit-warn::-moz-range-thumb {
+    background: #ffa726;
+}
+
+input[type="range"].limit-danger {
+    background: linear-gradient(90deg, #333 0%, #662200 100%);
+}
+
+input[type="range"].limit-danger::-webkit-slider-thumb {
+    background: #ef5350;
+}
+
+input[type="range"].limit-danger::-moz-range-thumb {
+    background: #ef5350;
+}
+
+/* ── Calibration wizard ────────────────────────────────────────────── */
+
+.cal-table {
+    font-size: 10px;
+}
+
+.cal-header {
+    display: grid;
+    grid-template-columns: 22px 44px 34px 40px 40px 22px;
+    gap: 2px;
+    color: #666;
+    margin-bottom: 2px;
+    text-align: center;
+}
+
+.cal-row {
+    display: grid;
+    grid-template-columns: 22px 44px 34px 40px 40px 22px;
+    gap: 2px;
+    margin-bottom: 2px;
+    align-items: center;
+}
+
+.cal-label {
+    color: #aaa;
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+.cal-input {
+    background: #222;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    border-radius: 2px;
+    padding: 2px 3px;
+    font-family: inherit;
+    font-size: 10px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.cal-input:focus {
+    outline: none;
+    border-color: #4fc3f7;
+}
+
+select.cal-input {
+    padding: 1px 2px;
+}
+
+.cal-btn {
+    background: #2a4a2a;
+    border: 1px solid #66bb6a;
+    color: #ccc;
+    border-radius: 2px;
+    padding: 2px 4px;
+    font-size: 10px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.cal-btn:hover {
+    background: #3a6a3a;
+    color: #fff;
+}
+
+.cal-test-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    margin-bottom: 2px;
+}
+
+.cal-test-btns {
+    display: flex;
+    gap: 2px;
+    flex: 1;
+}
+
+.cal-sm-btn {
+    background: #2a2a3a;
+    border: 1px solid #444;
+    color: #ccc;
+    border-radius: 2px;
+    padding: 2px 4px;
+    font-family: inherit;
+    font-size: 9px;
+    cursor: pointer;
+    flex: 1;
+    text-align: center;
+}
+
+.cal-sm-btn:hover {
+    background: #3a3a4a;
+    border-color: #4fc3f7;
+    color: #fff;
+}
+
+.cal-actions {
+    margin-top: 6px;
+}

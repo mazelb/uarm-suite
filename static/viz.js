@@ -144,6 +144,73 @@ const tipMesh = new THREE.Mesh(
 tipMesh.position.x = L_TOOL;
 toolGroup.add(tipMesh);
 
+// ── Workspace volume (LatheGeometry from 2D cross-section) ──────────────
+
+const J1_MIN = 0, J1_MAX = 135;
+const J2_MIN = -135, J2_MAX = 90;
+const paraFloor = (j1) => 2 * j1 - 180;
+
+function fk2d(j1, j2) {
+    const t1 = j1 * DEG2RAD;
+    const t2 = j2 * DEG2RAD;
+    const r = L1 * Math.cos(t1) + L2 * Math.cos(t2) + L_TOOL;
+    const z = L1 * Math.sin(t1) + L2 * Math.sin(t2) + H_BASE;
+    return new THREE.Vector2(r, z);
+}
+
+function computeWorkspaceProfile() {
+    const pts = [];
+    const step = 2;
+    const eps = 0.5;
+    const j1ParaDiagStart = (J2_MAX + 180) / 2 - eps;
+    const j1ParaDiagEnd = (J2_MIN + 180) / 2;
+
+    // Edge 1: j1=0, j2 from J2_MIN to J2_MAX
+    for (let j2 = J2_MIN; j2 <= J2_MAX; j2 += step)
+        pts.push(fk2d(0, j2));
+    // Edge 2: j2=J2_MAX, j1 from 0 up to parallelogram limit
+    for (let j1 = step; j1 <= j1ParaDiagStart; j1 += step)
+        pts.push(fk2d(j1, J2_MAX));
+    // Edge 3: parallelogram diagonal, j1 descending
+    for (let j1 = j1ParaDiagStart; j1 >= j1ParaDiagEnd; j1 -= step) {
+        const j2 = paraFloor(j1) + eps;
+        if (j2 >= J2_MIN && j2 <= J2_MAX) pts.push(fk2d(j1, j2));
+    }
+    // Edge 4: j2=J2_MIN, j1 from j1ParaDiagEnd down to 0
+    for (let j1 = j1ParaDiagEnd; j1 >= 0; j1 -= step)
+        pts.push(fk2d(j1, J2_MIN));
+    return pts;
+}
+
+const wsProfile = computeWorkspaceProfile();
+const wsGeom = new THREE.LatheGeometry(wsProfile, 36, -Math.PI / 2, Math.PI);
+const wsMat = new THREE.MeshPhongMaterial({
+    color: 0x4fc3f7,
+    transparent: true,
+    opacity: 0.06,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+});
+const workspaceMesh = new THREE.Mesh(wsGeom, wsMat);
+scene.add(workspaceMesh);
+
+const wsWireGeom = new THREE.LatheGeometry(wsProfile, 36, -Math.PI / 2, Math.PI);
+const wsWireMat = new THREE.MeshBasicMaterial({
+    color: 0x4fc3f7,
+    wireframe: true,
+    transparent: true,
+    opacity: 0.04,
+});
+const workspaceWire = new THREE.Mesh(wsWireGeom, wsWireMat);
+scene.add(workspaceWire);
+
+window._workspaceVisible = true;
+window.toggleWorkspace = function () {
+    window._workspaceVisible = !window._workspaceVisible;
+    workspaceMesh.visible = window._workspaceVisible;
+    workspaceWire.visible = window._workspaceVisible;
+};
+
 // ── Pose update ──────────────────────────────────────────────────────────
 
 function updateArm(state) {

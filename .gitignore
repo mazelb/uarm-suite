@@ -24,3 +24,6 @@ references/
 
 # Recorded teach-mode sessions (Phase 2+)
 recordings/
+
+# Per-machine servo calibration (Phase 6)
+calibration.json
