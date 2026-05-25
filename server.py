@@ -16,9 +16,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from arm import UArm
+from arm import RECORDINGS_DIR, UArm
 from config import SIM_UPDATE_HZ
-from kinematics import JointLimitError, WorkspaceError
+from kinematics import (
+    JointAngles,
+    JointLimitError,
+    WorkspaceError,
+    check_joint_limits,
+)
 
 _arm: UArm | None = None
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
@@ -61,12 +66,21 @@ class JointsCommand(BaseModel):
     speed: float | None = None
 
 
+class RecordStartCommand(BaseModel):
+    name: str
+
+
+class PlayCommand(BaseModel):
+    name: str
+    speed_factor: float = 1.0
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
 
-def _state_dict() -> dict[str, float]:
+def _state_dict() -> dict:
     assert _arm is not None
     angles = _arm.get_joint_angles()
     pos = _arm.get_position()
@@ -78,6 +92,7 @@ def _state_dict() -> dict[str, float]:
         "x": round(pos.x, 1),
         "y": round(pos.y, 1),
         "z": round(pos.z, 1),
+        "recording": _arm._recording,
     }
 
 
@@ -87,17 +102,17 @@ def _state_dict() -> dict[str, float]:
 
 
 @app.get("/api/state")
-async def api_state() -> dict[str, float]:
+async def api_state() -> dict:
     return _state_dict()
 
 
 @app.get("/api/where")
-async def api_where() -> dict[str, float]:
+async def api_where() -> dict:
     return _state_dict()
 
 
 @app.post("/api/home")
-async def api_home() -> dict[str, float]:
+async def api_home() -> dict:
     assert _arm is not None
     await asyncio.to_thread(_arm.home, True)
     return _state_dict()
@@ -125,6 +140,7 @@ async def api_goto(cmd: GotoCommand):
 async def api_joints(cmd: JointsCommand):
     assert _arm is not None
     try:
+        check_joint_limits(JointAngles(j0=cmd.j0, j1=cmd.j1, j2=cmd.j2, j3=cmd.j3))
         await asyncio.to_thread(
             _arm.set_joint_angles,
             cmd.j0,
@@ -136,6 +152,48 @@ async def api_joints(cmd: JointsCommand):
         )
     except (WorkspaceError, JointLimitError) as exc:
         return JSONResponse(status_code=422, content={"error": str(exc)})
+    return _state_dict()
+
+
+# ---------------------------------------------------------------------------
+# Recording / replay endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post("/api/record/start")
+async def api_record_start(cmd: RecordStartCommand):
+    assert _arm is not None
+    _arm.record_start(cmd.name)
+    return {"status": "recording", "name": cmd.name}
+
+
+@app.post("/api/record/stop")
+async def api_record_stop():
+    assert _arm is not None
+    path = await asyncio.to_thread(_arm.record_stop)
+    return {"status": "stopped", "path": str(path)}
+
+
+@app.get("/api/recordings")
+async def api_recordings():
+    if not RECORDINGS_DIR.is_dir():
+        return {"recordings": []}
+    names = sorted(p.stem for p in RECORDINGS_DIR.glob("*.json"))
+    return {"recordings": names}
+
+
+@app.post("/api/play")
+async def api_play(cmd: PlayCommand):
+    assert _arm is not None
+    try:
+        await asyncio.to_thread(
+            _arm.replay,
+            cmd.name,
+            speed_factor=cmd.speed_factor,
+            blocking=True,
+        )
+    except FileNotFoundError:
+        return JSONResponse(status_code=404, content={"error": f"Recording '{cmd.name}' not found"})
     return _state_dict()
 
 

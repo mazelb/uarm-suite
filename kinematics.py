@@ -151,7 +151,7 @@ def inverse_kinematics(x: float, y: float, z: float, wrist: float = 0.0) -> Join
         j2=math.degrees(t2),
         j3=wrist,
     )
-    _check_joint_limits(angles)
+    check_joint_limits(angles)
     return angles
 
 
@@ -177,7 +177,7 @@ def _clamp_unit(v: float) -> float:
     return v
 
 
-def _check_joint_limits(angles: JointAngles) -> None:
+def check_joint_limits(angles: JointAngles) -> None:
     for name, value, (lo, hi) in (
         ("j0", angles.j0, J0_LIMITS),
         ("j1", angles.j1, J1_LIMITS),

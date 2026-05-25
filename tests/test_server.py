@@ -10,11 +10,14 @@ from hardware import SimulatedBus
 
 
 @pytest.fixture()
-def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
     monkeypatch.setattr("arm.SLOW_HOME_DEG_PER_SEC", 10000.0)
     monkeypatch.setattr("arm.DEFAULT_DEG_PER_SEC", 10000.0)
+    monkeypatch.setattr("arm.RECORDINGS_DIR", tmp_path / "recordings")
 
     import server
+
+    monkeypatch.setattr(server, "RECORDINGS_DIR", tmp_path / "recordings")
 
     bus = SimulatedBus(max_deg_per_sec=10000)
     arm = UArm(bus=bus)
@@ -34,8 +37,9 @@ def test_state_returns_expected_keys(client: TestClient) -> None:
     resp = client.get("/api/state")
     assert resp.status_code == 200
     data = resp.json()
-    for key in ("j0", "j1", "j2", "j3", "x", "y", "z"):
+    for key in ("j0", "j1", "j2", "j3", "x", "y", "z", "recording"):
         assert key in data
+    assert data["recording"] is False
 
 
 # ------------------------------------------------------------------
@@ -106,6 +110,14 @@ def test_joints_success(client: TestClient) -> None:
     assert abs(data["j2"] - (-30.0)) < 1.0
 
 
+def test_joints_limit_error(client: TestClient) -> None:
+    resp = client.post("/api/joints", json={"j0": 0, "j1": 80, "j2": -30, "j3": 0})
+    assert resp.status_code == 422
+    data = resp.json()
+    assert "error" in data
+    assert "parallelogram" in data["error"]
+
+
 # ------------------------------------------------------------------
 # WebSocket /ws
 # ------------------------------------------------------------------
@@ -114,5 +126,50 @@ def test_joints_success(client: TestClient) -> None:
 def test_websocket_streams_state(client: TestClient) -> None:
     with client.websocket_connect("/ws") as ws:
         data = ws.receive_json()
-        for key in ("j0", "j1", "j2", "j3", "x", "y", "z"):
+        for key in ("j0", "j1", "j2", "j3", "x", "y", "z", "recording"):
             assert key in data
+
+
+# ------------------------------------------------------------------
+# Recording / replay
+# ------------------------------------------------------------------
+
+
+def test_record_start_stop(client: TestClient) -> None:
+    resp = client.post("/api/record/start", json={"name": "test_rec"})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "recording"
+
+    state = client.get("/api/state").json()
+    assert state["recording"] is True
+
+    resp = client.post("/api/record/stop")
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "stopped"
+
+
+def test_recordings_list(client: TestClient) -> None:
+    resp = client.get("/api/recordings")
+    assert resp.status_code == 200
+    assert resp.json()["recordings"] == []
+
+    client.post("/api/record/start", json={"name": "alpha"})
+    client.post("/api/record/stop")
+
+    resp = client.get("/api/recordings")
+    assert "alpha" in resp.json()["recordings"]
+
+
+def test_replay(client: TestClient) -> None:
+    client.post("/api/record/start", json={"name": "replay_test"})
+    client.post("/api/joints", json={"j0": 10, "j1": 60, "j2": -30, "j3": 0})
+    client.post("/api/record/stop")
+
+    resp = client.post("/api/play", json={"name": "replay_test"})
+    assert resp.status_code == 200
+
+
+def test_replay_not_found(client: TestClient) -> None:
+    resp = client.post("/api/play", json={"name": "nonexistent"})
+    assert resp.status_code == 404
+    assert "not found" in resp.json()["error"]

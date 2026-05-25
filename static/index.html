@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>uArm Swift — 3D Visualizer</title>
+    <title>uArm Swift — Control Suite</title>
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
@@ -20,6 +20,78 @@
         <hr>
         <div id="status">Connecting&hellip;</div>
     </div>
+
+    <div id="controls">
+        <div class="panel-header">
+            <span>Controls</span>
+            <button id="toggle-controls" title="Collapse">&lsaquo;</button>
+        </div>
+
+        <div id="controls-body">
+            <!-- Joint sliders -->
+            <div class="section">
+                <div class="section-title">Joints</div>
+                <label>J0 <span id="sl-j0-val">0.0</span>&deg;
+                    <input type="range" id="sl-j0" min="-90" max="90" step="0.5" value="0">
+                </label>
+                <label>J1 <span id="sl-j1-val">45.0</span>&deg;
+                    <input type="range" id="sl-j1" min="0" max="135" step="0.5" value="45">
+                </label>
+                <label>J2 <span id="sl-j2-val">-45.0</span>&deg;
+                    <input type="range" id="sl-j2" min="-135" max="90" step="0.5" value="-45">
+                </label>
+                <label>J3 <span id="sl-j3-val">0.0</span>&deg;
+                    <input type="range" id="sl-j3" min="-90" max="90" step="0.5" value="0">
+                </label>
+            </div>
+
+            <!-- Jog controls -->
+            <div class="section">
+                <div class="section-title">Jog</div>
+                <div class="jog-step-row">
+                    Step: <input type="number" id="jog-step" value="10" min="1" max="50" step="1"> mm
+                </div>
+                <div class="jog-grid">
+                    <button class="jog-btn" data-axis="x" data-dir="-1">X&minus;</button>
+                    <button class="jog-btn" data-axis="y" data-dir="-1">Y&minus;</button>
+                    <button class="jog-btn" data-axis="z" data-dir="-1">Z&minus;</button>
+                    <button class="jog-btn" data-axis="x" data-dir="1">X+</button>
+                    <button class="jog-btn" data-axis="y" data-dir="1">Y+</button>
+                    <button class="jog-btn" data-axis="z" data-dir="1">Z+</button>
+                </div>
+                <button id="home-btn" class="action-btn">Home</button>
+            </div>
+
+            <!-- Go-to position -->
+            <div class="section">
+                <div class="section-title">Go To</div>
+                <div class="goto-row">
+                    <label>X <input type="number" id="goto-x" value="250" step="1"></label>
+                    <label>Y <input type="number" id="goto-y" value="0" step="1"></label>
+                    <label>Z <input type="number" id="goto-z" value="50" step="1"></label>
+                    <label>W <input type="number" id="goto-w" value="0" step="1"></label>
+                </div>
+                <button id="goto-btn" class="action-btn">Go</button>
+            </div>
+
+            <!-- Teach / replay -->
+            <div class="section">
+                <div class="section-title">Teach</div>
+                <div class="teach-row">
+                    <input type="text" id="rec-name" placeholder="recording name" value="demo">
+                    <button id="rec-btn" class="action-btn">Record</button>
+                </div>
+                <div class="section-title" style="margin-top:8px">Recordings</div>
+                <div id="rec-list" class="rec-list"><em>none</em></div>
+                <div class="teach-row" style="margin-top:4px">
+                    <label>Speed <input type="number" id="replay-speed" value="1.0" min="0.1" max="5" step="0.1"></label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-container"></div>
+
     <script type="importmap">
     {
         "imports": {
@@ -29,5 +101,6 @@
     }
     </script>
     <script type="module" src="/viz.js"></script>
+    <script type="module" src="/app.js"></script>
 </body>
 </html>
