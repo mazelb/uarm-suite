@@ -23,6 +23,31 @@ uv run python cli.py goto 200 0 50
 uv run python cli.py joints 0 45 -45 0
 ```
 
+## Activities
+
+Arm-driven activities (games, drawing) live in the `activities/` package and are
+auto-discovered — drop a new module in there and it shows up everywhere, no core
+arm code to touch.
+
+```bash
+uv run uarm activity list                       # what's available
+uv run uarm activity run tic-tac-toe            # play in the terminal (you are X)
+uv run uarm activity run draw-shapes -o shape=star -o size=40
+```
+
+In the web UI, the **Activities** panel (top of Controls) has a clickable
+tic-tac-toe board and a shape-drawer; both animate the 3D arm. When the server is
+running, the CLI forwards to it so the terminal game and the browser share one arm.
+
+Two flavours, both behind one registry:
+- **Runnable** (e.g. draw-shapes) — `setup` → `run` → `cleanup`, runs to completion.
+- **Interactive** (e.g. tic-tac-toe) — a stateful session driven turn by turn via
+  `start` / `human_move` / `state`.
+
+The tic-tac-toe AI is unbeatable (minimax). Drawing commands the tool-tip Cartesian
+position as the pen contact point and lifts between strokes; on hardware the pen
+mount offset is absorbed into Z calibration. See `docs/walkthroughs/phase7.md`.
+
 ## Hardware setup
 
 ### Components
