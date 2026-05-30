@@ -16,8 +16,10 @@ reference.
    serial-bus type, PWM won't drive them and the wiring changes entirely. Verify
    before buying or wiring anything.
 
-Per `CLAUDE.md` rules 8 and 9: hardware-touching code needs an explicit "go" each
-step, and hardware results are reported by Maz (never fabricated).
+Per `CLAUDE.md` rules 8 and 9: hardware testing is active — hardware-touching code
+may be run without a per-command "go", but any command that moves the arm under
+power is announced first (what it runs, how the arm moves); results are reported
+truthfully, never fabricated.
 
 ---
 
@@ -27,11 +29,12 @@ step, and hardware results are reported by Maz (never fabricated).
 We're doing the FIRST hardware bring-up of the uArm Swift on the Raspberry Pi,
 working toward running the tic-tac-toe activity (Phase 7) on the real arm.
 
-Read CLAUDE.md first. Rules 8 and 9 are in force: this session WILL touch real
-hardware (I2C, GPIO, servo PWM). Before EVERY hardware-touching step, stop, tell
-me exactly what command you're about to run and what the arm will physically do,
-and wait for my explicit "go". Do not fabricate results — I am the one watching
-the arm; I'll tell you what actually happened. Pure-sim commands you may run freely.
+Read CLAUDE.md first. Rules 8 and 9 are in force: hardware testing is active, so
+you may run hardware-touching code (I2C, GPIO, servo PWM) without waiting for a
+per-command "go" — BUT before any command that moves the arm under power, state
+exactly what you're about to run and how the arm will physically move. I'm
+watching the arm and will tell you what actually happened; do not fabricate
+results. Pure-sim commands you may run freely.
 
 Current state: Phases 1-7 committed, 134 tests pass in sim. The PCA9685Bus exists
 (hardware.py) and is selected by UARM_MODE=hardware. Servo calibration lives in
@@ -47,7 +50,8 @@ Known gaps to handle this session:
 - The bus assumes servos start at joint 0 (servo center ~90°) on first connect;
   the first move centers the servos, so I'll support the arm by hand on power-up.
 
-Bring it up in stages, pausing for my "go" and my report at each:
+Bring it up in stages. Announce each move, then pause for my report of what the
+arm actually did before advancing to the next stage:
 
   STAGE 0 — Bench check (no arm powered): sudo i2cdetect -y 1 shows 0x40.
   STAGE 1 — Servo sanity, one joint at a time, arm held by hand: bring up the

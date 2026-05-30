@@ -17,8 +17,8 @@ Deliverables: Python API, CLI, inverse kinematics, record/replay teach mode, and
 5. **Never silently clamp.** Out-of-workspace targets or joint-limit violations raise `WorkspaceError` or `JointLimitError`. The CLI/UI surfaces the error.
 6. **No blocking on long moves.** `set_position` and `move_along` run in a background thread. FastAPI handlers must stay responsive.
 7. **Slow-home on startup.** Max 30°/s to a known safe pose. Never snap servos to position from an unknown state.
-8. **Ask before running hardware-touching code.** Anything that opens `/dev/i2c-*`, writes GPIO, or imports `board`/`busio` for real requires my explicit "go" first. Pure sim code: run freely.
-9. **Don't fabricate hardware test results.** I run hardware tests on the Pi. When I haven't said "I ran it on the Pi and X," assume hardware is untested.
+8. **Hardware testing is active — announce, then run.** Direct hardware tests have begun. You may run hardware-touching code (opens `/dev/i2c-*`, writes GPIO, imports `board`/`busio`) without waiting for a per-command "go". But before any command that moves the arm under power, first state what it runs and how the arm will physically move. Pure sim code: run freely, no announcement needed.
+9. **Don't fabricate hardware test results.** Report only what actually happened — real observed output, never invented. Distinguish results from your own runs versus mine; when neither of us has run something on the Pi, say it's untested.
 10. **Don't pull in the official uArm Python SDK.** We're replacing it, not depending on it.
 
 ## Tooling
