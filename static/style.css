@@ -533,3 +533,82 @@ select.cal-input {
 .cal-actions {
     margin-top: 6px;
 }
+
+/* ── Activities ──────────────────────────────────────────────────── */
+
+.activity-select {
+    width: 100%;
+    background: #222;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 4px 6px;
+    border-radius: 4px;
+    font-size: 12px;
+}
+
+.activity-desc {
+    color: #888;
+    font-size: 11px;
+    margin: 4px 0;
+}
+
+.ttt-config,
+.shapes-config {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    font-size: 11px;
+    color: #aaa;
+}
+
+.ttt-config input,
+.shapes-config input,
+.shapes-config select {
+    width: 100%;
+    background: #222;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    border-radius: 3px;
+}
+
+.ttt-board {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 4px;
+    margin: 8px 0;
+}
+
+.ttt-cell {
+    aspect-ratio: 1 / 1;
+    background: #222;
+    border: 1px solid #444;
+    border-radius: 4px;
+    color: #e0e0e0;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.ttt-cell:not(:disabled):hover {
+    background: #2a4a6a;
+    border-color: #4fc3f7;
+}
+
+.ttt-cell:disabled {
+    cursor: default;
+}
+
+.ttt-cell.x {
+    color: #4fc3f7;
+}
+
+.ttt-cell.o {
+    color: #ef5350;
+}
+
+.ttt-status {
+    color: #b0b0b0;
+    font-size: 12px;
+    text-align: center;
+    min-height: 16px;
+}

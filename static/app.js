@@ -341,8 +341,125 @@ document.getElementById("cal-reset").addEventListener("click", async () => {
     showToast("Calibration reset to defaults", "info", 2000);
 });
 
+// ── Activities ──────────────────────────────────────────────────────
+
+let activitiesMeta = [];
+let tttBusy = false;
+const activitySelect = document.getElementById("activity-select");
+
+async function loadActivities() {
+    const data = await apiGet("/api/activities");
+    activitiesMeta = data.activities || [];
+    activitySelect.innerHTML = "";
+    for (const a of activitiesMeta) {
+        const opt = document.createElement("option");
+        opt.value = a.slug;
+        opt.textContent = a.name;
+        activitySelect.appendChild(opt);
+    }
+    updateActivityUI();
+}
+
+function currentActivity() {
+    return activitiesMeta.find((a) => a.slug === activitySelect.value);
+}
+
+function updateActivityUI() {
+    const a = currentActivity();
+    const isTTT = a && a.slug === "tic-tac-toe";
+    const isShapes = a && a.slug === "draw-shapes";
+    document.getElementById("activity-desc").textContent = a ? a.description : "";
+    document.getElementById("ttt-widget").style.display = isTTT ? "block" : "none";
+    document.getElementById("shapes-widget").style.display = isShapes ? "block" : "none";
+    // Generic Run button only for non-interactive activities without a custom widget.
+    const generic = a && !a.interactive && !isShapes;
+    document.getElementById("activity-run").style.display = generic ? "block" : "none";
+    if (isTTT) renderBoard(_emptyState());
+}
+
+activitySelect.addEventListener("change", updateActivityUI);
+
+document.getElementById("activity-run").addEventListener("click", async () => {
+    const a = currentActivity();
+    if (!a) return;
+    const btn = document.getElementById("activity-run");
+    btn.disabled = true; btn.textContent = "Running…";
+    await apiPost(`/api/activities/${a.slug}/run`);
+    btn.disabled = false; btn.textContent = "Run";
+});
+
+// ── Tic-tac-toe ─────────────────────────────────────────────────────
+
+function _emptyState() {
+    return {
+        board: [["", "", ""], ["", "", ""], ["", "", ""]],
+        turn: "X", status: "Press New Game to start.", over: true,
+    };
+}
+
+function renderBoard(state) {
+    const boardEl = document.getElementById("ttt-board");
+    boardEl.innerHTML = "";
+    for (let r = 0; r < 3; r++) {
+        for (let c = 0; c < 3; c++) {
+            const cell = document.createElement("button");
+            cell.className = "ttt-cell";
+            const v = state.board[r][c];
+            cell.textContent = v;
+            cell.classList.toggle("x", v === "X");
+            cell.classList.toggle("o", v === "O");
+            const playable = !tttBusy && !state.over && state.turn === "X" && v === "";
+            cell.disabled = !playable;
+            cell.addEventListener("click", () => tttMove(r, c));
+            boardEl.appendChild(cell);
+        }
+    }
+    document.getElementById("ttt-status").textContent = state.status;
+}
+
+async function tttNewGame() {
+    if (tttBusy) return;
+    tttBusy = true;
+    document.getElementById("ttt-status").textContent = "Drawing grid…";
+    const options = {
+        center_x: parseFloat(document.getElementById("ttt-cx").value) || 250,
+        center_y: parseFloat(document.getElementById("ttt-cy").value) || 0,
+        cell: parseFloat(document.getElementById("ttt-cell").value) || 40,
+    };
+    const state = await apiPost("/api/activities/tic-tac-toe/start", options);
+    tttBusy = false;
+    if (state) renderBoard(state);
+}
+
+async function tttMove(r, c) {
+    if (tttBusy) return;
+    tttBusy = true;
+    document.getElementById("ttt-status").textContent = "Thinking…";
+    const state = await apiPost("/api/activities/tic-tac-toe/move", { row: r, col: c });
+    tttBusy = false;
+    if (state) renderBoard(state);
+}
+
+document.getElementById("ttt-new").addEventListener("click", tttNewGame);
+
+// ── Draw-shapes ─────────────────────────────────────────────────────
+
+document.getElementById("shapes-draw").addEventListener("click", async () => {
+    const btn = document.getElementById("shapes-draw");
+    const options = {
+        shape: document.getElementById("shapes-shape").value,
+        size: parseFloat(document.getElementById("shapes-size").value) || 40,
+        center_x: parseFloat(document.getElementById("shapes-cx").value) || 250,
+        center_y: parseFloat(document.getElementById("shapes-cy").value) || 0,
+    };
+    btn.disabled = true; btn.textContent = "Drawing…";
+    await apiPost("/api/activities/draw-shapes/run", options);
+    btn.disabled = false; btn.textContent = "Draw";
+});
+
 // ── Init ────────────────────────────────────────────────────────────
 
 connectControlWs();
 refreshRecordings();
 loadCalibration();
+loadActivities();

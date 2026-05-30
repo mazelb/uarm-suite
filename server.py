@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import threading
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,6 +18,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import activities
 from arm import RECORDINGS_DIR, UArm
 from config import (
     SERVO_CALIBRATION,
@@ -33,6 +35,12 @@ from kinematics import (
 _arm: UArm | None = None
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 CALIBRATION_PATH = Path("calibration.json")
+
+# One interactive activity session at a time, guarded so overlapping move
+# requests can't interleave arm commands.
+_session: object | None = None
+_session_slug: str | None = None
+_session_lock = threading.Lock()
 
 
 def _load_calibration() -> None:
@@ -56,6 +64,7 @@ def _save_calibration() -> None:
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _arm
     _load_calibration()
+    activities.discover()
     if _arm is None:
         _arm = UArm()
         _arm.connect()
@@ -105,6 +114,17 @@ class CalibrationUpdate(BaseModel):
     max_us: int | None = None
     zero_deg: float | None = None
     direction: int | None = None
+
+
+class ActivityStart(BaseModel):
+    # Opaque per-activity options (e.g. tic-tac-toe grid placement). Extra keys
+    # are accepted and passed straight through to the activity.
+    model_config = {"extra": "allow"}
+
+
+class ActivityMove(BaseModel):
+    # Opaque per-activity action (e.g. {"row": 1, "col": 2}).
+    model_config = {"extra": "allow"}
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +293,97 @@ async def api_calibration_reset():
             direction=1,
         )
     return {str(ch): dict(cal) for ch, cal in SERVO_CALIBRATION.items()}
+
+
+# ---------------------------------------------------------------------------
+# Activities
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/activities")
+async def api_activities() -> dict:
+    return {"activities": activities.list_activities()}
+
+
+@app.post("/api/activities/{slug}/run")
+async def api_activity_run(slug: str, cmd: ActivityStart):
+    assert _arm is not None
+    try:
+        cls = activities.get_activity(slug)
+    except KeyError:
+        return JSONResponse(status_code=404, content={"error": f"unknown activity {slug!r}"})
+    options = cmd.model_dump()
+
+    def _run() -> None:
+        inst = cls()
+        # Optional per-activity configuration from the request body.
+        if options and hasattr(inst, "configure"):
+            inst.configure(options)
+        with _session_lock:
+            inst.setup(_arm)
+            try:
+                inst.run(_arm)
+            finally:
+                inst.cleanup(_arm)
+
+    try:
+        await asyncio.to_thread(_run)
+    except (WorkspaceError, JointLimitError) as exc:
+        return JSONResponse(status_code=422, content={"error": str(exc)})
+    return {"status": "done", "slug": slug}
+
+
+@app.post("/api/activities/{slug}/start")
+async def api_activity_start(slug: str, cmd: ActivityStart):
+    global _session, _session_slug
+    assert _arm is not None
+    try:
+        cls = activities.get_activity(slug)
+    except KeyError:
+        return JSONResponse(status_code=404, content={"error": f"unknown activity {slug!r}"})
+    if not activities.is_interactive(cls):
+        return JSONResponse(
+            status_code=422, content={"error": f"{slug!r} is not an interactive activity"}
+        )
+
+    inst = cls()
+    options = cmd.model_dump()
+
+    def _start() -> dict:
+        with _session_lock:
+            return inst.start(_arm, options)
+
+    try:
+        state = await asyncio.to_thread(_start)
+    except (WorkspaceError, JointLimitError, ValueError) as exc:
+        return JSONResponse(status_code=422, content={"error": str(exc)})
+    _session, _session_slug = inst, slug
+    return state
+
+
+@app.post("/api/activities/{slug}/move")
+async def api_activity_move(slug: str, cmd: ActivityMove):
+    assert _arm is not None
+    if _session is None or _session_slug != slug:
+        return JSONResponse(status_code=409, content={"error": f"no active {slug!r} session"})
+    action = cmd.model_dump()
+    session = _session
+
+    def _move() -> dict:
+        with _session_lock:
+            return session.human_move(_arm, **action)
+
+    try:
+        return await asyncio.to_thread(_move)
+    except (WorkspaceError, JointLimitError, ValueError, TypeError) as exc:
+        return JSONResponse(status_code=422, content={"error": str(exc)})
+
+
+@app.get("/api/activities/{slug}/state")
+async def api_activity_state(slug: str):
+    if _session is None or _session_slug != slug:
+        return JSONResponse(status_code=409, content={"error": f"no active {slug!r} session"})
+    return _session.state()
 
 
 # ---------------------------------------------------------------------------

@@ -28,6 +28,44 @@
         </div>
 
         <div id="controls-body">
+            <!-- Activities -->
+            <div class="section">
+                <div class="section-title">Activities</div>
+                <select id="activity-select" class="activity-select"></select>
+                <div id="activity-desc" class="activity-desc"></div>
+                <button id="activity-run" class="action-btn" style="margin-top:4px">Run</button>
+
+                <!-- Tic-tac-toe widget -->
+                <div id="ttt-widget" style="display:none; margin-top:8px">
+                    <div class="ttt-config">
+                        <label>cX <input type="number" id="ttt-cx" value="250" step="1"></label>
+                        <label>cY <input type="number" id="ttt-cy" value="0" step="1"></label>
+                        <label>cell <input type="number" id="ttt-cell" value="40" step="1"></label>
+                    </div>
+                    <button id="ttt-new" class="action-btn" style="margin-top:4px">New Game</button>
+                    <div id="ttt-board" class="ttt-board"></div>
+                    <div id="ttt-status" class="ttt-status">Press New Game to start.</div>
+                </div>
+
+                <!-- Draw-shapes widget -->
+                <div id="shapes-widget" style="display:none; margin-top:8px">
+                    <div class="shapes-config">
+                        <label>Shape
+                            <select id="shapes-shape">
+                                <option value="square">Square</option>
+                                <option value="triangle">Triangle</option>
+                                <option value="star">Star</option>
+                                <option value="circle">Circle</option>
+                            </select>
+                        </label>
+                        <label>Size <input type="number" id="shapes-size" value="40" step="1"></label>
+                        <label>cX <input type="number" id="shapes-cx" value="250" step="1"></label>
+                        <label>cY <input type="number" id="shapes-cy" value="0" step="1"></label>
+                    </div>
+                    <button id="shapes-draw" class="action-btn" style="margin-top:4px">Draw</button>
+                </div>
+            </div>
+
             <!-- Joint sliders -->
             <div class="section">
                 <div class="section-title">Joints</div>

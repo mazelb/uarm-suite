@@ -55,8 +55,12 @@ class ActivityBase(Protocol):
 class InteractiveActivity(ActivityBase, Protocol):
     """A turn-based activity driven by a human between arm moves."""
 
-    def start(self, arm: UArm) -> dict:
-        """Begin a fresh session and return the initial state dict."""
+    def start(self, arm: UArm, options: dict | None = None) -> dict:
+        """Begin a fresh session and return the initial state dict.
+
+        ``options`` is an opaque per-activity configuration dict (e.g. grid
+        placement), passed straight through from the API request body.
+        """
         ...
 
     def human_move(self, arm: UArm, **action: object) -> dict:

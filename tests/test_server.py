@@ -173,3 +173,54 @@ def test_replay_not_found(client: TestClient) -> None:
     resp = client.post("/api/play", json={"name": "nonexistent"})
     assert resp.status_code == 404
     assert "not found" in resp.json()["error"]
+
+
+# ------------------------------------------------------------------
+# Activities
+# ------------------------------------------------------------------
+
+
+def test_activities_list(client: TestClient) -> None:
+    resp = client.get("/api/activities")
+    assert resp.status_code == 200
+    slugs = {a["slug"]: a for a in resp.json()["activities"]}
+    assert "tic-tac-toe" in slugs
+    assert slugs["tic-tac-toe"]["interactive"] is True
+
+
+def test_tic_tac_toe_start_and_move(client: TestClient) -> None:
+    resp = client.post("/api/activities/tic-tac-toe/start", json={})
+    assert resp.status_code == 200
+    state = resp.json()
+    assert state["started"] is True
+    assert state["turn"] == "X"
+
+    resp = client.post("/api/activities/tic-tac-toe/move", json={"row": 1, "col": 1})
+    assert resp.status_code == 200
+    state = resp.json()
+    assert state["board"][1][1] == "X"
+
+    # state endpoint mirrors the session
+    resp = client.get("/api/activities/tic-tac-toe/state")
+    assert resp.status_code == 200
+    assert resp.json()["board"][1][1] == "X"
+
+
+def test_tic_tac_toe_invalid_move_422(client: TestClient) -> None:
+    client.post("/api/activities/tic-tac-toe/start", json={})
+    client.post("/api/activities/tic-tac-toe/move", json={"row": 0, "col": 0})
+    resp = client.post("/api/activities/tic-tac-toe/move", json={"row": 0, "col": 0})
+    assert resp.status_code == 422
+
+
+def test_move_without_session_409(client: TestClient) -> None:
+    server_mod = __import__("server")
+    server_mod._session = None
+    server_mod._session_slug = None
+    resp = client.post("/api/activities/tic-tac-toe/move", json={"row": 0, "col": 0})
+    assert resp.status_code == 409
+
+
+def test_unknown_activity_404(client: TestClient) -> None:
+    resp = client.post("/api/activities/nope/start", json={})
+    assert resp.status_code == 404
