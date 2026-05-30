@@ -210,3 +210,34 @@ def test_where_uses_server_when_available() -> None:
         assert result.exit_code == 0
         assert "268.1" in result.stdout
         mock_get.assert_called_once_with("/api/state")
+
+
+# ------------------------------------------------------------------
+# activity
+# ------------------------------------------------------------------
+
+
+def test_activity_list_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cli._server_running", lambda: False)
+    result = runner.invoke(app, ["activity", "list"])
+    assert result.exit_code == 0
+    assert "tic-tac-toe" in result.stdout
+    assert "interactive" in result.stdout
+
+
+def test_activity_run_unknown(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cli._server_running", lambda: False)
+    result = runner.invoke(app, ["activity", "run", "nope"])
+    assert result.exit_code == 1
+    assert "unknown activity" in (result.stdout + (result.stderr or ""))
+
+
+def test_activity_run_tic_tac_toe_local(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("cli._server_running", lambda: False)
+    monkeypatch.setattr("arm.SLOW_HOME_DEG_PER_SEC", 100000.0)
+    monkeypatch.setattr("arm.DEFAULT_DEG_PER_SEC", 100000.0)
+    # Human plays first-free cells; against optimal O this terminates quickly.
+    moves = "0 0\n0 1\n1 0\n1 2\n2 0\n2 1\n2 2\nq\n"
+    result = runner.invoke(app, ["activity", "run", "tic-tac-toe"], input=moves)
+    assert result.exit_code == 0
+    assert "Game over" in result.stdout

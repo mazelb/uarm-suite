@@ -13,9 +13,11 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+from typing import Annotated
 
 import typer
 
+import activities
 from arm import RECORDINGS_DIR, UArm
 from kinematics import JointLimitError, WorkspaceError
 
@@ -213,6 +215,130 @@ def list_recordings() -> None:
         return
     for f in files:
         typer.echo(f.stem)
+
+
+# ------------------------------------------------------------------
+# Activities
+# ------------------------------------------------------------------
+
+activity_app = typer.Typer(add_completion=False, help="Arm-driven activities (games, drawing).")
+app.add_typer(activity_app, name="activity")
+
+
+def _coerce(value: str) -> object:
+    """Best-effort scalar coercion for `--option key=value` values."""
+    for caster in (int, float):
+        try:
+            return caster(value)
+        except ValueError:
+            continue
+    return value
+
+
+def _print_board(board: list[list[str]]) -> None:
+    sym = {"": " ", "X": "X", "O": "O"}
+    rows = [" " + " | ".join(sym[board[r][c]] for c in range(3)) for r in range(3)]
+    typer.echo(("\n" + "---+---+---\n").join(rows))
+
+
+def _play_terminal_game(do_start, do_move) -> None:
+    """Drive an interactive game in the terminal via the given callables."""
+    state = do_start()
+    typer.echo(f"\n{state['status']}")
+    _print_board(state["board"])
+    while not state["over"]:
+        raw = typer.prompt("Your move 'row col' (0-2), or 'q' to quit")
+        if raw.strip().lower() in ("q", "quit", "exit"):
+            typer.echo("Quit.")
+            return
+        try:
+            parts = raw.replace(",", " ").split()
+            r, c = int(parts[0]), int(parts[1])
+        except (ValueError, IndexError):
+            typer.echo("Enter two numbers 0-2, e.g. '1 2'.")
+            continue
+        if not (0 <= r <= 2 and 0 <= c <= 2) or state["board"][r][c]:
+            typer.echo("That cell is taken or out of range.")
+            continue
+        typer.echo("Thinking…")
+        state = do_move(r, c)
+        typer.echo(f"\n{state['status']}")
+        _print_board(state["board"])
+    typer.echo(f"\nGame over: {state['status']}")
+
+
+@activity_app.command("list")
+def activity_list() -> None:
+    """List available activities."""
+    if _server_running():
+        items = _get_json("/api/activities")["activities"]
+    else:
+        activities.discover()
+        items = activities.list_activities()
+    if not items:
+        typer.echo("No activities found.")
+        return
+    for a in items:
+        kind = "interactive" if a["interactive"] else "runnable"
+        typer.echo(f"{a['slug']:14} [{kind:11}] {a['name']} — {a['description']}")
+
+
+@activity_app.command("run")
+def activity_run(
+    slug: str,
+    option: Annotated[
+        list[str] | None,
+        typer.Option("--option", "-o", help="Activity option as key=value (repeatable)."),
+    ] = None,
+) -> None:
+    """Run an activity. Interactive activities (e.g. tic-tac-toe) play in the terminal."""
+    options: dict[str, object] = {}
+    for kv in option or []:
+        key, _, val = kv.partition("=")
+        options[key.strip()] = _coerce(val.strip())
+
+    activities.discover()
+    try:
+        cls = activities.get_activity(slug)
+    except KeyError:
+        typer.echo(f"Error: unknown activity {slug!r}", err=True)
+        raise typer.Exit(code=1) from None
+    interactive = activities.is_interactive(cls)
+
+    if _server_running():
+        if interactive:
+            _play_terminal_game(
+                lambda: _post_json(f"/api/activities/{slug}/start", options),
+                lambda r, c: _post_json(f"/api/activities/{slug}/move", {"row": r, "col": c}),
+            )
+        else:
+            _post_json(f"/api/activities/{slug}/run", options)
+            typer.echo(f"{slug} complete.")
+        return
+
+    # Local fallback — no shared 3D viz.
+    arm = UArm().connect()
+    arm.home(blocking=True)
+    inst = cls()
+    try:
+        if interactive:
+            _play_terminal_game(
+                lambda: inst.start(arm, options),
+                lambda r, c: inst.human_move(arm, row=r, col=c),
+            )
+        else:
+            if options and hasattr(inst, "configure"):
+                inst.configure(options)
+            inst.setup(arm)
+            try:
+                inst.run(arm)
+            finally:
+                inst.cleanup(arm)
+            typer.echo(f"{slug} complete.")
+    except (WorkspaceError, JointLimitError) as exc:
+        _handle_arm_error(exc)
+    finally:
+        arm.disconnect()
 
 
 @app.command()
