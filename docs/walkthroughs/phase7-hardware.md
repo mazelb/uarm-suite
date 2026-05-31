@@ -21,6 +21,24 @@ may be run without a per-command "go", but any command that moves the arm under
 power is announced first (what it runs, how the arm moves); results are reported
 truthfully, never fabricated.
 
+## Stage −1 — Dry run on the dev box (no Pi, no risk)
+
+Before any wiring, vet the real driver code path with **mock hardware mode**
+(`mockhw.py`). `UARM_MODE=mock` builds the actual `PCA9685Bus` against an
+in-memory fake PCA9685 — same PWM duty math, slew loop, and calibration
+conversion that will run on the Pi — and prints the servo pulses:
+
+```bash
+UARM_MODE=mock UARM_MOCK_VERBOSE=1 uv run uarm goto 250 0 50
+UARM_MODE=mock UARM_MOCK_VERBOSE=1 uv run python server.py   # full UI/game dry run
+```
+
+Confirm the pulse widths look sane (home → J0 1500µs, J1 2000µs, J2 1000µs,
+J3 1500µs with default calibration) and the duty cycles change with the target.
+This catches driver/calibration-math bugs with zero hardware risk. It does NOT
+tell you whether the arm reaches a pose physically — that's what the staged
+hardware run below is for.
+
 ---
 
 ## Part A — Prompt for a fresh session (paste this on the Pi)

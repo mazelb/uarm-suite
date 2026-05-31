@@ -158,9 +158,28 @@ UARM_MODE=hardware uv run python cli.py goto 200 0 50
 
 ## Environment variables
 
-| Variable    | Values            | Default | Description               |
-|-------------|-------------------|---------|---------------------------|
-| `UARM_MODE` | `sim`, `hardware` | `sim`   | Bus implementation to use |
+| Variable            | Values                      | Default | Description                                                   |
+|---------------------|-----------------------------|---------|---------------------------------------------------------------|
+| `UARM_MODE`         | `sim`, `hardware`, `mock`   | `sim`   | Bus implementation to use                                     |
+| `UARM_MOCK_VERBOSE` | `1` / `true`                | off     | In `mock` mode, print every servo PWM write                   |
+
+### Mock hardware mode (dry run, no Pi)
+
+`UARM_MODE=mock` runs the **real** `PCA9685Bus` code path — PWM duty math, the
+50 Hz slew loop, calibration conversion, channel writes — against an in-memory
+fake PCA9685 (`mockhw.py`). It needs no Raspberry Pi and no Adafruit libraries,
+so you can exercise the hardware driver and watch the exact servo pulses before
+touching real silicon:
+
+```bash
+# Run the whole suite through the hardware driver on a dev machine:
+UARM_MODE=mock UARM_MOCK_VERBOSE=1 uv run python server.py
+UARM_MODE=mock UARM_MOCK_VERBOSE=1 uv run uarm goto 250 0 50
+```
+
+It is a *dry run*, not arm physics — it tells you what pulses would be sent, not
+whether the arm reaches the target. Use `sim` for behaviour, `mock` to vet the
+driver.
 
 ## Tests
 

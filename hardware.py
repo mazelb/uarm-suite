@@ -269,11 +269,25 @@ class PCA9685Bus:
 
 
 def make_bus(mode: str | None = None) -> ServoBus:
-    """Create a ServoBus based on UARM_MODE env var (default ``sim``)."""
+    """Create a ServoBus based on UARM_MODE env var (default ``sim``).
+
+    Modes:
+      ``sim``       — SimulatedBus (default; fakes arm physics).
+      ``hardware``  — real PCA9685Bus driving servos via I2C (needs a Pi).
+      ``mock``      — real PCA9685Bus against a fake PCA9685 (no Pi). Exercises
+                      the genuine hardware code path on a dev machine; set
+                      ``UARM_MOCK_VERBOSE=1`` to print each servo write.
+    """
     if mode is None:
         mode = os.environ.get("UARM_MODE", "sim")
     if mode == "sim":
         return SimulatedBus()
     if mode == "hardware":
         return PCA9685Bus()
-    raise ValueError(f"unknown UARM_MODE: {mode!r} (expected 'sim' or 'hardware')")
+    if mode == "mock":
+        import mockhw
+
+        verbose = os.environ.get("UARM_MOCK_VERBOSE", "").lower() in ("1", "true", "yes")
+        mockhw.install(verbose=verbose)
+        return PCA9685Bus()
+    raise ValueError(f"unknown UARM_MODE: {mode!r} (expected 'sim', 'hardware', or 'mock')")
