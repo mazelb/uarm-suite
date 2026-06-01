@@ -36,13 +36,7 @@ implemented in sim. Phase 8 is the bridge to the real arm: make it actually draw
 - Re-validate that real geometry constants (`H_BASE`, `L1`, `L2`, `L_TOOL`)
   match the measured arm — update `config.py` if Maz re-measures.
 
-### 8C: Closing the loop (stretch)
-- Sense the human's physical move instead of clicking the web board: a camera +
-  simple grid/marker detection, or a tap sensor per cell. Keep it behind the
-  `ActivityBase` boundary — activities still talk only through `UArm` plus a new
-  input source.
-
-### 8D: More activities (stretch)
+### 8C: More activities (stretch)
 - Prove the framework again: e.g. "draw text", "Etch-A-Sketch jog mode", or a
   second game. Each is just a new module in `activities/`.
 
