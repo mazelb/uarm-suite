@@ -59,10 +59,11 @@ const matTip = new THREE.MeshPhongMaterial({ color: 0xff5722 });
 
 // ── Arm hierarchy ────────────────────────────────────────────────────────
 //
-// Three.js is Y-up.  Arm coordinate mapping:
+// Three.js is Y-up.  Arm coordinate mapping (as produced by the rotations below
+// — baseGroup.rotation.y = -j0):
 //   arm X (radial)  →  Three.js +X
 //   arm Z (up)      →  Three.js +Y
-//   arm Y (lateral) →  Three.js -Z
+//   arm Y (lateral) →  Three.js +Z
 //
 // j0 rotates around Y.  j1/j2 rotate around local Z in the arm plane.
 
@@ -244,8 +245,9 @@ function traceTick(state) {
     if (!traceEnabled) return;
     if (state.z <= penThreshold) {
         if (!curLine) _startStroke();
-        // arm (x, y, z) → three (x, z, -y); flatten onto the pen plane.
-        curPts.push(state.x, planeY, -state.y);
+        // Renderer maps arm (x, y, z) → three (x, z, y) (baseGroup.rotation.y =
+        // -j0 sends arm +Y to three +Z). Flatten onto the pen plane.
+        curPts.push(state.x, planeY, state.y);
         curLine.geometry.setAttribute(
             "position",
             new THREE.BufferAttribute(new Float32Array(curPts), 3),
