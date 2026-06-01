@@ -102,10 +102,20 @@ Open `http://localhost:8000`.
    you somehow drew, no celebration.
 4. Change `cell` to e.g. `50` and click **New Game** — the drawn grid is larger.
 
+**Drawing trace.** A white ink trace follows the tool tip whenever the pen is at
+contact height, so you can see what the arm actually drew (the `#` grid, the
+`X`s and `O`s) building up on the table plane in 3D. Orbit to a top-down view to
+read it like paper. **New Game** clears the trace; the **Trace drawing** checkbox
+and **Clear** button (top of the Activities panel) toggle and reset it. The trace
+shows the *real* tip path, so near-straight strokes may bow slightly — that's the
+arm's actual motion between waypoints, not a rendering artifact.
+
 ## 6. Web UI — draw shapes
 
 1. In the Activities dropdown, choose **Draw Shapes**.
-2. Pick a shape, set size/center, click **Draw**. The 3D arm draws it.
+2. Pick a shape, set size/center, click **Draw**. The 3D arm draws it, and the
+   white trace shows the resulting shape on the table plane. Draw several to
+   compare; **Clear** wipes the trace.
 
 ## 7. CLI driving the running server (shared viz)
 

@@ -379,6 +379,14 @@ function updateActivityUI() {
 
 activitySelect.addEventListener("change", updateActivityUI);
 
+// Drawing trace controls (viz.js exposes window.trace)
+document.getElementById("trace-clear").addEventListener("click", () => {
+    window.trace?.clear();
+});
+document.getElementById("trace-toggle").addEventListener("change", (e) => {
+    window.trace?.setEnabled(e.target.checked);
+});
+
 document.getElementById("activity-run").addEventListener("click", async () => {
     const a = currentActivity();
     if (!a) return;
@@ -421,6 +429,7 @@ async function tttNewGame() {
     if (tttBusy) return;
     tttBusy = true;
     document.getElementById("ttt-status").textContent = "Drawing grid…";
+    window.trace?.clear(); // fresh board, fresh trace
     const options = {
         center_x: parseFloat(document.getElementById("ttt-cx").value) || 250,
         center_y: parseFloat(document.getElementById("ttt-cy").value) || 0,
@@ -428,7 +437,10 @@ async function tttNewGame() {
     };
     const state = await apiPost("/api/activities/tic-tac-toe/start", options);
     tttBusy = false;
-    if (state) renderBoard(state);
+    if (state) {
+        if (state.config) window.trace?.configure(state.config.table_z, state.config.pen_up);
+        renderBoard(state);
+    }
 }
 
 async function tttMove(r, c) {
@@ -452,6 +464,7 @@ document.getElementById("shapes-draw").addEventListener("click", async () => {
         center_x: parseFloat(document.getElementById("shapes-cx").value) || 250,
         center_y: parseFloat(document.getElementById("shapes-cy").value) || 0,
     };
+    window.trace?.configure(0, 20); // draw-shapes uses default pen geometry
     btn.disabled = true; btn.textContent = "Drawing…";
     await apiPost("/api/activities/draw-shapes/run", options);
     btn.disabled = false; btn.textContent = "Draw";

@@ -612,3 +612,19 @@ select.cal-input {
     text-align: center;
     min-height: 16px;
 }
+
+.trace-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    font-size: 11px;
+    color: #aaa;
+    margin: 4px 0;
+}
+
+.trace-row label {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}

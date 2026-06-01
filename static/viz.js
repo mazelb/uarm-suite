@@ -211,6 +211,71 @@ window.toggleWorkspace = function () {
     workspaceWire.visible = window._workspaceVisible;
 };
 
+// ── Drawing trace ──────────────────────────────────────────────────────────
+//
+// Records the tool-tip path while the pen is at contact height (arm z at or
+// below `penThreshold`), so you can see what the arm actually drew. Points are
+// flattened onto the pen plane (`planeY`) for a clean on-paper trace. Each
+// pen-lift ends the current stroke; the next pen-down starts a new line.
+
+const traceGroup = new THREE.Group();
+scene.add(traceGroup);
+const traceMat = new THREE.LineBasicMaterial({ color: 0xffffff });
+
+let traceEnabled = true;
+let penThreshold = 6; // arm mm; trace when tip z <= this
+let planeY = 0.5; // arm mm; flatten trace onto this height (just above the floor)
+let curPts = null; // active stroke: flat [x,y,z, ...] in three.js space
+let curLine = null;
+
+function _startStroke() {
+    curPts = [];
+    curLine = new THREE.Line(new THREE.BufferGeometry(), traceMat);
+    curLine.frustumCulled = false;
+    traceGroup.add(curLine);
+}
+
+function _endStroke() {
+    curPts = null;
+    curLine = null;
+}
+
+function traceTick(state) {
+    if (!traceEnabled) return;
+    if (state.z <= penThreshold) {
+        if (!curLine) _startStroke();
+        // arm (x, y, z) → three (x, z, -y); flatten onto the pen plane.
+        curPts.push(state.x, planeY, -state.y);
+        curLine.geometry.setAttribute(
+            "position",
+            new THREE.BufferAttribute(new Float32Array(curPts), 3),
+        );
+        curLine.geometry.setDrawRange(0, curPts.length / 3);
+    } else {
+        _endStroke();
+    }
+}
+
+window.trace = {
+    clear() {
+        for (const line of [...traceGroup.children]) {
+            traceGroup.remove(line);
+            line.geometry.dispose();
+        }
+        _endStroke();
+    },
+    // Configure from an activity's pen geometry (mm). Trace just below the
+    // travel height so descents don't smear, flattened onto the table plane.
+    configure(tableZ = 0, penUp = 20) {
+        planeY = tableZ + 0.5; // just above the table so it doesn't z-fight the floor
+        penThreshold = tableZ + Math.max(2, penUp * 0.3);
+    },
+    setEnabled(on) {
+        traceEnabled = !!on;
+        if (!on) _endStroke();
+    },
+};
+
 // ── Pose update ──────────────────────────────────────────────────────────
 
 function updateArm(state) {
@@ -249,6 +314,7 @@ function connectWebSocket() {
         const state = JSON.parse(event.data);
         updateArm(state);
         updateInfo(state);
+        traceTick(state);
     };
 
     ws.onclose = () => {
