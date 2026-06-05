@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from drawing import load_drawing_config
+
 from . import register_activity
 from ._draw import Stroke, draw_strokes
 
@@ -71,13 +73,14 @@ class DrawShapes:
     description = "Draw a square, triangle, star, or circle at a position."
 
     def __init__(self) -> None:
+        d = load_drawing_config()
         self.shape = "square"
         self.size = 40.0
         self.center_x = 250.0
         self.center_y = 0.0
-        self.table_z = 0.0
-        self.pen_up = 20.0
-        self.wrist = 0.0
+        self.table_z = d.table_z  # persisted pen-down height (drawing.json)
+        self.pen_up = d.pen_up
+        self.wrist = d.wrist
 
     def configure(self, options: dict) -> None:
         for key in ("shape", "size", "center_x", "center_y", "table_z", "pen_up", "wrist"):

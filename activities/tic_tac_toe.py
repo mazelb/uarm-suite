@@ -25,6 +25,7 @@ import time
 from dataclasses import asdict, dataclass
 from typing import TYPE_CHECKING
 
+from drawing import load_drawing_config
 from kinematics import JointAngles, check_joint_limits
 
 from . import register_activity
@@ -187,6 +188,15 @@ class GridConfig:
         return x, y
 
 
+def default_grid_config() -> GridConfig:
+    """A GridConfig seeded with the persisted pen height (``drawing.json``).
+
+    Falls back to the dataclass defaults when no config has been calibrated.
+    """
+    d = load_drawing_config()
+    return GridConfig(table_z=d.table_z, pen_up=d.pen_up, wrist=d.wrist)
+
+
 def grid_strokes(cfg: GridConfig) -> list[Stroke]:
     """The two vertical + two horizontal lines forming the # outline."""
     half = 1.5 * cfg.cell  # outer extent of the 3-cell grid
@@ -284,7 +294,7 @@ class TicTacToe:
     description = "Play tic-tac-toe against the arm — you are X, the arm is O."
 
     def __init__(self, config: GridConfig | None = None) -> None:
-        self.config = config or GridConfig()
+        self.config = config or default_grid_config()
         self.board = Board()
         self.human = X
         self.ai = O

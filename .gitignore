@@ -27,3 +27,6 @@ recordings/
 
 # Per-machine servo calibration (Phase 6)
 calibration.json
+
+# Per-machine / per-pen drawing calibration (Phase 8)
+drawing.json

@@ -12,14 +12,23 @@ import json
 import time
 import urllib.error
 import urllib.request
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Annotated
 
 import typer
 
 import activities
+import drawing
 from arm import RECORDINGS_DIR, UArm
-from kinematics import JointLimitError, WorkspaceError
+from drawing import (
+    grid_corners,
+    load_drawing_config,
+    save_drawing_config,
+    unreachable_corners,
+)
+from kinematics import JointLimitError, WorkspaceError, in_workspace
 
 app = typer.Typer(add_completion=False)
 
@@ -339,6 +348,173 @@ def activity_run(
         _handle_arm_error(exc)
     finally:
         arm.disconnect()
+
+
+# ------------------------------------------------------------------
+# Pen drawing calibration (Phase 8A)
+# ------------------------------------------------------------------
+
+pen_app = typer.Typer(
+    add_completion=False,
+    help="Pen drawing calibration: pen-down Z height and dry-run jog.",
+)
+app.add_typer(pen_app, name="pen")
+
+
+@contextmanager
+def _drawing_arm() -> Iterator[Callable[..., None]]:
+    """Yield a ``goto(x, y, z, wrist)`` callable for pen jog/calibrate.
+
+    Forwards to the running server (shared 3D viz) when one is up, otherwise
+    drives a freshly slow-homed local UArm. Callers must only pass targets they
+    have already checked with ``in_workspace`` / ``unreachable_corners``.
+    """
+    if _server_running():
+
+        def goto(x: float, y: float, z: float, wrist: float = 0.0) -> None:
+            _post_json("/api/goto", {"x": x, "y": y, "z": z, "wrist": wrist, "speed": None})
+
+        yield goto
+    else:
+        with UArm() as arm:
+            typer.echo("Slow-homing to a safe pose…")
+            arm.home(blocking=True)
+
+            def goto(x: float, y: float, z: float, wrist: float = 0.0) -> None:
+                try:
+                    arm.set_position(x, y, z, wrist=wrist, blocking=True)
+                except (WorkspaceError, JointLimitError) as exc:
+                    _handle_arm_error(exc)
+
+            yield goto
+
+
+@pen_app.command("show")
+def pen_show() -> None:
+    """Print the persisted pen-drawing config."""
+    cfg = load_drawing_config()
+    typer.echo(f"table_z  = {cfg.table_z:6.1f} mm   (pen-down contact height)")
+    typer.echo(f"pen_up   = {cfg.pen_up:6.1f} mm   (travel clearance)")
+    typer.echo(f"pen_up_z = {cfg.pen_up_z:6.1f} mm")
+    typer.echo(f"wrist    = {cfg.wrist:6.1f} deg")
+    typer.echo(f"pen      = {cfg.pen_label or '(unlabeled)'}")
+    path = drawing.DRAWING_PATH
+    if path.exists():
+        typer.echo(f"(saved at {path})")
+    else:
+        typer.echo(f"(no {path} yet — showing defaults)")
+
+
+@pen_app.command("set")
+def pen_set(
+    table_z: float | None = typer.Option(None, "--table-z", help="Pen-down contact height (mm)"),
+    pen_up: float | None = typer.Option(None, "--pen-up", help="Travel clearance above table (mm)"),
+    wrist: float | None = typer.Option(None, "--wrist", help="Wrist angle while drawing (deg)"),
+    label: str | None = typer.Option(None, "--label", help="Which pen this is calibrated for"),
+) -> None:
+    """Set one or more drawing-config values and save (no motion)."""
+    cfg = load_drawing_config()
+    if table_z is not None:
+        cfg.table_z = table_z
+    if pen_up is not None:
+        cfg.pen_up = pen_up
+    if wrist is not None:
+        cfg.wrist = wrist
+    if label is not None:
+        cfg.pen_label = label
+    save_drawing_config(cfg)
+    typer.echo(f"Saved to {drawing.DRAWING_PATH}.")
+    pen_show()
+
+
+@pen_app.command("calibrate")
+def pen_calibrate(
+    x: float = typer.Option(250.0, "--x", help="X to hover the pen over while jogging"),
+    y: float = typer.Option(0.0, "--y", help="Y to hover the pen over while jogging"),
+    start_z: float | None = typer.Option(None, "--start-z", help="Starting Z (default: pen_up_z)"),
+    step: float = typer.Option(2.0, "--step", help="Initial jog step (mm)"),
+) -> None:
+    """Interactively jog Z down until the pen touches the paper, then save it.
+
+    Moves the arm. Each step is workspace-checked before motion, so the pen is
+    never commanded outside reach. Save records the current Z as ``table_z``.
+    """
+    cfg = load_drawing_config()
+    z = start_z if start_z is not None else cfg.pen_up_z
+    if not in_workspace(x, y, z, wrist=cfg.wrist):
+        typer.echo(
+            f"Error: start point ({x:.0f}, {y:.0f}, {z:.1f}) is outside the workspace.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo("Pen-down Z calibration.")
+    typer.echo(f"Hovering the pen at ({x:.0f}, {y:.0f}); jog Z until it just kisses the paper.")
+    typer.echo("Commands: [Enter] lower by step · 'u' raise by step · 'step <mm>' change step")
+    typer.echo("          's' save table_z here · 'q' quit without saving")
+
+    with _drawing_arm() as goto:
+        goto(x, y, z, cfg.wrist)
+        while True:
+            raw = (
+                typer.prompt(f"z={z:.1f}mm step={step:.1f}", default="", show_default=False)
+                .strip()
+                .lower()
+            )
+            if raw in ("q", "quit", "exit"):
+                typer.echo("Aborted — nothing saved.")
+                return
+            if raw in ("s", "save"):
+                cfg.table_z = z
+                save_drawing_config(cfg)
+                typer.echo(f"Saved table_z = {z:.1f} mm to {drawing.DRAWING_PATH}.")
+                return
+            if raw.startswith("step"):
+                parts = raw.split()
+                try:
+                    step = abs(float(parts[1]))
+                except (IndexError, ValueError):
+                    typer.echo("Usage: step <mm>, e.g. 'step 0.5'")
+                continue
+            delta = step if raw in ("u", "up") else -step  # Enter (empty) = down
+            new_z = z + delta
+            if not in_workspace(x, y, new_z, wrist=cfg.wrist):
+                typer.echo(f"  z={new_z:.1f} is outside the workspace — staying at {z:.1f}.")
+                continue
+            z = new_z
+            goto(x, y, z, cfg.wrist)
+
+
+@pen_app.command("jog-corners")
+def pen_jog_corners(
+    center_x: float = typer.Option(250.0, "--center-x", help="Grid center X (mm)"),
+    center_y: float = typer.Option(0.0, "--center-y", help="Grid center Y (mm)"),
+    cell: float = typer.Option(40.0, "--cell", help="Grid cell size (mm)"),
+) -> None:
+    """Dry-run: visit each grid corner at pen-up height to check placement.
+
+    Validates every corner up front (refusing if any is unreachable) so the
+    grid footprint is confirmed on paper before a single stroke is drawn.
+    """
+    cfg = load_drawing_config()
+    corners = grid_corners(center_x, center_y, cell)
+    bad = unreachable_corners(corners, cfg.pen_up_z, wrist=cfg.wrist)
+    if bad:
+        listed = ", ".join(f"({x:.0f}, {y:.0f})" for x, y in bad)
+        typer.echo(
+            f"Error: {len(bad)} grid corner(s) unreachable at pen-up Z "
+            f"{cfg.pen_up_z:.1f}: {listed}. Move/shrink the grid.",
+            err=True,
+        )
+        raise typer.Exit(code=1)
+
+    typer.echo(f"Jogging the 4 grid corners at pen-up Z {cfg.pen_up_z:.1f} mm (pen never lowers).")
+    with _drawing_arm() as goto:
+        for i, (cx, cy) in enumerate(corners, start=1):
+            typer.echo(f"  corner {i}/4 → ({cx:.0f}, {cy:.0f})")
+            goto(cx, cy, cfg.pen_up_z, cfg.wrist)
+            typer.prompt("    [Enter] for next corner", default="", show_default=False)
+    typer.echo("Done — all four corners reached.")
 
 
 @app.command()
