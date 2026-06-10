@@ -160,6 +160,31 @@ def inverse_kinematics(x: float, y: float, z: float, wrist: float = 0.0) -> Join
 # ---------------------------------------------------------------------------
 
 
+def interpolate_line(
+    p0: tuple[float, float, float],
+    p1: tuple[float, float, float],
+    step_mm: float,
+) -> list[tuple[float, float, float]]:
+    """Evenly spaced points along the segment p0 → p1, at most ``step_mm`` apart.
+
+    Excludes ``p0``, includes ``p1`` (always exactly, no float accumulation —
+    each point is computed from the endpoints). A zero-length segment yields
+    just ``[p1]``.
+    """
+    if step_mm <= 0:
+        raise ValueError(f"step_mm must be positive, got {step_mm}")
+    dist = math.dist(p0, p1)
+    n = max(1, math.ceil(dist / step_mm))
+    return [
+        (
+            p0[0] + (p1[0] - p0[0]) * i / n,
+            p0[1] + (p1[1] - p0[1]) * i / n,
+            p0[2] + (p1[2] - p0[2]) * i / n,
+        )
+        for i in range(1, n + 1)
+    ]
+
+
 def in_workspace(x: float, y: float, z: float, wrist: float = 0.0) -> bool:
     """Return True if (x, y, z) is reachable under both geometry and joint limits."""
     try:

@@ -176,6 +176,8 @@ class GridConfig:
     pen_up: float = 20.0  # lift above table_z between strokes
     wrist: float = 0.0
     mark_scale: float = 0.35  # mark half-size as a fraction of cell
+    feed: float | None = None  # pen-down mm/s; None = suite default
+    travel_feed: float | None = None  # pen-up mm/s; None = suite default
 
     @property
     def pen_up_z(self) -> float:
@@ -194,7 +196,13 @@ def default_grid_config() -> GridConfig:
     Falls back to the dataclass defaults when no config has been calibrated.
     """
     d = load_drawing_config()
-    return GridConfig(table_z=d.table_z, pen_up=d.pen_up, wrist=d.wrist)
+    return GridConfig(
+        table_z=d.table_z,
+        pen_up=d.pen_up,
+        wrist=d.wrist,
+        feed=d.feed,
+        travel_feed=d.travel_feed,
+    )
 
 
 def grid_strokes(cfg: GridConfig) -> list[Stroke]:
@@ -244,6 +252,8 @@ def _draw(arm: UArm, cfg: GridConfig, strokes: list[Stroke]) -> None:
         table_z=cfg.table_z,
         pen_up_z=cfg.pen_up_z,
         wrist=cfg.wrist,
+        feed=cfg.feed,
+        travel_feed=cfg.travel_feed,
     )
 
 

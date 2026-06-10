@@ -13,6 +13,8 @@ from hardware import SimulatedBus
 def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
     monkeypatch.setattr("arm.SLOW_HOME_DEG_PER_SEC", 10000.0)
     monkeypatch.setattr("arm.DEFAULT_DEG_PER_SEC", 10000.0)
+    monkeypatch.setattr("activities._draw.DRAW_FEED_MM_S", 1e6)
+    monkeypatch.setattr("activities._draw.TRAVEL_FEED_MM_S", 1e6)
     monkeypatch.setattr("arm.RECORDINGS_DIR", tmp_path / "recordings")
 
     import server

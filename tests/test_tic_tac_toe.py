@@ -128,11 +128,16 @@ class FakeArm:
 
     def __init__(self) -> None:
         self.positions: list[tuple[float, float, float]] = []
+        self.feeds: list[float] = []  # feed per move_linear, parallel to positions
         self.joints: list[tuple[float, float, float, float]] = []
         self.homed = False
 
     def set_position(self, x, y, z, *, wrist=0.0, speed=None, blocking=False):
         self.positions.append((x, y, z))
+
+    def move_linear(self, x, y, z, *, wrist=0.0, feed, step_mm=None):
+        self.positions.append((x, y, z))
+        self.feeds.append(feed)
 
     def set_joint_angles(self, j0, j1, j2, j3, *, speed=None, blocking=False):
         self.joints.append((j0, j1, j2, j3))

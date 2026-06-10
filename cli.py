@@ -22,6 +22,7 @@ import typer
 import activities
 import drawing
 from arm import RECORDINGS_DIR, UArm
+from config import DRAW_FEED_MM_S, TRAVEL_FEED_MM_S
 from drawing import (
     grid_corners,
     load_drawing_config,
@@ -397,6 +398,12 @@ def pen_show() -> None:
     typer.echo(f"pen_up   = {cfg.pen_up:6.1f} mm   (travel clearance)")
     typer.echo(f"pen_up_z = {cfg.pen_up_z:6.1f} mm")
     typer.echo(f"wrist    = {cfg.wrist:6.1f} deg")
+    feed = cfg.feed if cfg.feed is not None else DRAW_FEED_MM_S
+    travel = cfg.travel_feed if cfg.travel_feed is not None else TRAVEL_FEED_MM_S
+    feed_note = "" if cfg.feed is not None else "   (suite default — tune on paper)"
+    travel_note = "" if cfg.travel_feed is not None else "   (suite default)"
+    typer.echo(f"feed     = {feed:6.1f} mm/s (pen down){feed_note}")
+    typer.echo(f"travel   = {travel:6.1f} mm/s (pen up){travel_note}")
     typer.echo(f"pen      = {cfg.pen_label or '(unlabeled)'}")
     path = drawing.DRAWING_PATH
     if path.exists():
@@ -410,6 +417,10 @@ def pen_set(
     table_z: float | None = typer.Option(None, "--table-z", help="Pen-down contact height (mm)"),
     pen_up: float | None = typer.Option(None, "--pen-up", help="Travel clearance above table (mm)"),
     wrist: float | None = typer.Option(None, "--wrist", help="Wrist angle while drawing (deg)"),
+    feed: float | None = typer.Option(None, "--feed", help="Pen-down tool-tip speed (mm/s)"),
+    travel_feed: float | None = typer.Option(
+        None, "--travel-feed", help="Pen-up travel speed (mm/s)"
+    ),
     label: str | None = typer.Option(None, "--label", help="Which pen this is calibrated for"),
 ) -> None:
     """Set one or more drawing-config values and save (no motion)."""
@@ -420,6 +431,10 @@ def pen_set(
         cfg.pen_up = pen_up
     if wrist is not None:
         cfg.wrist = wrist
+    if feed is not None:
+        cfg.feed = feed
+    if travel_feed is not None:
+        cfg.travel_feed = travel_feed
     if label is not None:
         cfg.pen_label = label
     save_drawing_config(cfg)

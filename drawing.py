@@ -33,6 +33,10 @@ class DrawingConfig:
     pen_up: float = 20.0  # travel clearance above table_z between strokes
     wrist: float = 0.0  # wrist angle held while drawing
     pen_label: str = ""  # which pen this was calibrated for (free text)
+    # Feed rates (mm/s of the tool tip). None = use the suite defaults
+    # (config.DRAW_FEED_MM_S / TRAVEL_FEED_MM_S); set once tuned on paper.
+    feed: float | None = None  # pen on paper
+    travel_feed: float | None = None  # pen-up travel
 
     @property
     def pen_up_z(self) -> float:

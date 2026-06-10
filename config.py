@@ -96,3 +96,11 @@ SERVO_CALIBRATION: dict[int, ServoCalibration] = {
 SLOW_HOME_DEG_PER_SEC: float = 30.0
 DEFAULT_DEG_PER_SEC: float = 180.0
 SIM_UPDATE_HZ: float = 50.0
+
+# Drawing feed rates (Phase 8B). Cartesian tool-tip speeds in mm/s — distinct
+# from the joint speeds above. Strokes are subdivided into DRAW_STEP_MM
+# straight-line steps so the pen tip follows the stroke geometry instead of
+# the curve a joint-space slew would trace. Tune on paper.
+DRAW_FEED_MM_S: float = 40.0  # pen on paper
+TRAVEL_FEED_MM_S: float = 120.0  # pen-up travel between strokes
+DRAW_STEP_MM: float = 2.0  # linear-interpolation step length

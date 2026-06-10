@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
 import threading
 import time
 from collections.abc import Callable, Iterable
@@ -17,6 +18,7 @@ from pathlib import Path
 from config import (
     CHANNELS,
     DEFAULT_DEG_PER_SEC,
+    DRAW_STEP_MM,
     SLOW_HOME_DEG_PER_SEC,
 )
 from hardware import ServoBus, make_bus
@@ -24,6 +26,7 @@ from kinematics import (
     JointAngles,
     Position,
     forward_kinematics,
+    interpolate_line,
     inverse_kinematics,
 )
 
@@ -137,6 +140,61 @@ class UArm:
     def get_position(self) -> Position:
         a = self.get_joint_angles()
         return forward_kinematics(a.j0, a.j1, a.j2, a.j3)
+
+    def move_linear(
+        self,
+        x: float,
+        y: float,
+        z: float,
+        *,
+        wrist: float = 0.0,
+        feed: float,
+        step_mm: float | None = None,
+    ) -> None:
+        """Move the tool tip in a straight line to (x, y, z) at ``feed`` mm/s.
+
+        A plain joint-space slew between distant targets curves the tool path;
+        this subdivides the segment into ``step_mm`` Cartesian steps and paces
+        them so the *tip* moves at the requested feed (clamped where a step
+        would exceed DEFAULT_DEG_PER_SEC on any joint). IK for every step is
+        solved before any motion, so an unreachable midpoint refuses cleanly
+        instead of half-drawing.
+
+        Blocking by design: drawing code sequences strokes synchronously. Use
+        ``set_position``/``move_along`` for fire-and-forget moves.
+        """
+        if feed <= 0:
+            raise ValueError(f"feed must be positive mm/s, got {feed}")
+        step = step_mm if step_mm is not None else DRAW_STEP_MM
+
+        start_joints = self._target_joints
+        if start_joints is None:
+            start_joints = self.get_joint_angles()
+        start = forward_kinematics(*start_joints)
+
+        points = interpolate_line((start.x, start.y, start.z), (x, y, z), step)
+        waypoints = [inverse_kinematics(px, py, pz, wrist=wrist) for px, py, pz in points]
+        step_len = math.dist((start.x, start.y, start.z), (x, y, z)) / len(points)
+        nominal_dt = step_len / feed
+
+        prev = start_joints
+        t_next = time.monotonic()
+        try:
+            for angles in waypoints:
+                delta = max(abs(a - b) for a, b in zip(angles, prev, strict=True))
+                prev = angles
+                if delta < 1e-9:
+                    continue
+                dt = max(nominal_dt, delta / DEFAULT_DEG_PER_SEC)
+                self._bus.set_speed(max(delta / dt, 1.0))
+                self._send_joints(angles)
+                t_next += dt
+                pause = t_next - time.monotonic()
+                if pause > 0:
+                    time.sleep(pause)
+            self._wait_at_target()
+        finally:
+            self._bus.set_speed(DEFAULT_DEG_PER_SEC)
 
     def move_along(
         self,

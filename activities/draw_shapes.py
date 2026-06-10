@@ -81,9 +81,21 @@ class DrawShapes:
         self.table_z = d.table_z  # persisted pen-down height (drawing.json)
         self.pen_up = d.pen_up
         self.wrist = d.wrist
+        self.feed = d.feed  # mm/s feeds; None = suite defaults
+        self.travel_feed = d.travel_feed
 
     def configure(self, options: dict) -> None:
-        for key in ("shape", "size", "center_x", "center_y", "table_z", "pen_up", "wrist"):
+        for key in (
+            "shape",
+            "size",
+            "center_x",
+            "center_y",
+            "table_z",
+            "pen_up",
+            "wrist",
+            "feed",
+            "travel_feed",
+        ):
             if key in options:
                 setattr(self, key, options[key])
 
@@ -98,6 +110,8 @@ class DrawShapes:
             table_z=self.table_z,
             pen_up_z=self.table_z + self.pen_up,
             wrist=self.wrist,
+            feed=self.feed,
+            travel_feed=self.travel_feed,
         )
 
     def cleanup(self, arm: UArm) -> None:

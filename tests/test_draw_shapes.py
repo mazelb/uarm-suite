@@ -35,10 +35,15 @@ def test_unknown_shape_raises():
 class FakeArm:
     def __init__(self):
         self.positions = []
+        self.feeds = []  # feed passed with each move_linear, parallel to positions
         self.homed = False
 
     def set_position(self, x, y, z, *, wrist=0.0, speed=None, blocking=False):
         self.positions.append((x, y, z))
+
+    def move_linear(self, x, y, z, *, wrist=0.0, feed, step_mm=None):
+        self.positions.append((x, y, z))
+        self.feeds.append(feed)
 
     def home(self, blocking=True):
         self.homed = True
