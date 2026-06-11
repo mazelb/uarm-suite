@@ -15,6 +15,7 @@ def client(monkeypatch: pytest.MonkeyPatch, tmp_path) -> TestClient:
     monkeypatch.setattr("arm.DEFAULT_DEG_PER_SEC", 10000.0)
     monkeypatch.setattr("activities._draw.DRAW_FEED_MM_S", 1e6)
     monkeypatch.setattr("activities._draw.TRAVEL_FEED_MM_S", 1e6)
+    monkeypatch.setattr("server.TRAVEL_FEED_MM_S", 1e6)  # pen jog-corners pacing
     monkeypatch.setattr("arm.RECORDINGS_DIR", tmp_path / "recordings")
 
     import server
@@ -175,6 +176,70 @@ def test_replay_not_found(client: TestClient) -> None:
     resp = client.post("/api/play", json={"name": "nonexistent"})
     assert resp.status_code == 404
     assert "not found" in resp.json()["error"]
+
+
+# ------------------------------------------------------------------
+# Pen / drawing config
+# ------------------------------------------------------------------
+
+
+def test_pen_get_defaults(client: TestClient) -> None:
+    resp = client.get("/api/pen")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["table_z"] == 0.0
+    assert data["pen_up"] == 20.0
+    assert data["pen_up_z"] == 20.0
+    assert data["feed"] is None  # no override persisted
+    assert data["travel_feed"] is None
+    assert data["effective_feed"] > 0  # suite default fills in
+    assert data["effective_travel_feed"] > 0
+    assert data["saved"] is False
+
+
+def test_pen_update_persists(client: TestClient) -> None:
+    resp = client.post(
+        "/api/pen", json={"table_z": -28.5, "feed": 60.0, "pen_label": "Sharpie fine"}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["table_z"] == -28.5
+    assert data["pen_up"] == 20.0  # untouched fields keep their values
+    assert data["feed"] == 60.0
+    assert data["effective_feed"] == 60.0
+    assert data["pen_label"] == "Sharpie fine"
+    assert data["saved"] is True
+    # Round-trips through drawing.json.
+    assert client.get("/api/pen").json()["table_z"] == -28.5
+
+
+def test_pen_null_clears_feed_but_not_geometry(client: TestClient) -> None:
+    client.post("/api/pen", json={"table_z": -30.0, "feed": 60.0})
+    data = client.post("/api/pen", json={"feed": None, "table_z": None}).json()
+    assert data["feed"] is None  # explicit null clears the override
+    assert data["table_z"] == -30.0  # null is ignored for required geometry
+
+
+def test_pen_jog_corners(client: TestClient) -> None:
+    resp = client.post(
+        "/api/pen/jog-corners", json={"center_x": 250.0, "center_y": 0.0, "cell": 40.0}
+    )
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "done"
+    assert len(data["corners"]) == 4
+    assert data["pen_up_z"] == 20.0
+    # The jog loops back to the first corner.
+    state = client.get("/api/state").json()
+    cx, cy = data["corners"][0]
+    assert abs(state["x"] - cx) < 2.0
+    assert abs(state["y"] - cy) < 2.0
+
+
+def test_pen_jog_corners_unreachable_422(client: TestClient) -> None:
+    resp = client.post("/api/pen/jog-corners", json={"cell": 200.0})
+    assert resp.status_code == 422
+    assert "unreachable" in resp.json()["error"]
 
 
 # ------------------------------------------------------------------

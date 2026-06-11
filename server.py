@@ -19,11 +19,20 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import activities
+import drawing
 from arm import RECORDINGS_DIR, UArm
 from config import (
+    DRAW_FEED_MM_S,
     SERVO_CALIBRATION,
     SIM_UPDATE_HZ,
+    TRAVEL_FEED_MM_S,
     ServoCalibration,
+)
+from drawing import (
+    grid_corners,
+    load_drawing_config,
+    save_drawing_config,
+    unreachable_corners,
 )
 from kinematics import (
     JointAngles,
@@ -114,6 +123,24 @@ class CalibrationUpdate(BaseModel):
     max_us: int | None = None
     zero_deg: float | None = None
     direction: int | None = None
+
+
+class PenUpdate(BaseModel):
+    # All fields optional; only the ones present in the request are applied.
+    # An explicit null feed/travel_feed clears the override back to the suite
+    # default (distinguished from "absent" via model_fields_set).
+    table_z: float | None = None
+    pen_up: float | None = None
+    wrist: float | None = None
+    feed: float | None = None
+    travel_feed: float | None = None
+    pen_label: str | None = None
+
+
+class PenJogCommand(BaseModel):
+    center_x: float = 250.0
+    center_y: float = 0.0
+    cell: float = 40.0
 
 
 class ActivityStart(BaseModel):
@@ -293,6 +320,87 @@ async def api_calibration_reset():
             direction=1,
         )
     return {str(ch): dict(cal) for ch, cal in SERVO_CALIBRATION.items()}
+
+
+# ---------------------------------------------------------------------------
+# Pen / drawing config (drawing.json)
+# ---------------------------------------------------------------------------
+
+
+def _pen_dict() -> dict:
+    cfg = load_drawing_config()
+    return {
+        "table_z": cfg.table_z,
+        "pen_up": cfg.pen_up,
+        "pen_up_z": cfg.pen_up_z,
+        "wrist": cfg.wrist,
+        "pen_label": cfg.pen_label,
+        "feed": cfg.feed,
+        "travel_feed": cfg.travel_feed,
+        "effective_feed": cfg.feed if cfg.feed is not None else DRAW_FEED_MM_S,
+        "effective_travel_feed": (
+            cfg.travel_feed if cfg.travel_feed is not None else TRAVEL_FEED_MM_S
+        ),
+        "saved": drawing.DRAWING_PATH.exists(),
+    }
+
+
+@app.get("/api/pen")
+async def api_pen() -> dict:
+    return _pen_dict()
+
+
+@app.post("/api/pen")
+async def api_pen_update(cmd: PenUpdate) -> dict:
+    cfg = load_drawing_config()
+    for field in cmd.model_fields_set:
+        value = getattr(cmd, field)
+        if value is None and field not in ("feed", "travel_feed", "pen_label"):
+            continue  # null only clears the clearable fields
+        setattr(cfg, field, value)
+    if cfg.pen_label is None:  # null label = clear it
+        cfg.pen_label = ""
+    save_drawing_config(cfg)
+    return _pen_dict()
+
+
+@app.post("/api/pen/jog-corners")
+async def api_pen_jog_corners(cmd: PenJogCommand):
+    """Dry-run: visit the four grid corners at pen-up height.
+
+    All corners are validated up front (422 if any is unreachable). The first
+    corner is approached with a joint-space move; corner-to-corner edges run
+    straight at the travel feed, each refusing before motion if a midpoint is
+    out of reach.
+    """
+    assert _arm is not None
+    cfg = load_drawing_config()
+    corners = grid_corners(cmd.center_x, cmd.center_y, cmd.cell)
+    bad = unreachable_corners(corners, cfg.pen_up_z, wrist=cfg.wrist)
+    if bad:
+        listed = ", ".join(f"({x:.0f}, {y:.0f})" for x, y in bad)
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": (
+                    f"{len(bad)} grid corner(s) unreachable at pen-up Z "
+                    f"{cfg.pen_up_z:.1f}: {listed}. Move/shrink the grid."
+                )
+            },
+        )
+    travel = cfg.travel_feed if cfg.travel_feed is not None else TRAVEL_FEED_MM_S
+
+    def _jog() -> None:
+        x0, y0 = corners[0]
+        _arm.set_position(x0, y0, cfg.pen_up_z, wrist=cfg.wrist, blocking=True)
+        for x, y in [*corners[1:], corners[0]]:  # loop back to close the rectangle
+            _arm.move_linear(x, y, cfg.pen_up_z, wrist=cfg.wrist, feed=travel)
+
+    try:
+        await asyncio.to_thread(_jog)
+    except (WorkspaceError, JointLimitError) as exc:
+        return JSONResponse(status_code=422, content={"error": str(exc)})
+    return {"status": "done", "corners": corners, "pen_up_z": cfg.pen_up_z}
 
 
 # ---------------------------------------------------------------------------

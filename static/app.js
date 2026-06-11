@@ -341,6 +341,67 @@ document.getElementById("cal-reset").addEventListener("click", async () => {
     showToast("Calibration reset to defaults", "info", 2000);
 });
 
+// ── Pen / drawing config ────────────────────────────────────────────
+
+let penCfg = null; // last-loaded /api/pen response
+
+function renderPen() {
+    if (!penCfg) return;
+    document.getElementById("pen-table-z").value = penCfg.table_z;
+    document.getElementById("pen-up").value = penCfg.pen_up;
+    document.getElementById("pen-wrist").value = penCfg.wrist;
+    document.getElementById("pen-label").value = penCfg.pen_label || "";
+    const feedEl = document.getElementById("pen-feed");
+    const travelEl = document.getElementById("pen-travel-feed");
+    feedEl.value = penCfg.feed ?? "";
+    feedEl.placeholder = `${penCfg.effective_feed}`;
+    travelEl.value = penCfg.travel_feed ?? "";
+    travelEl.placeholder = `${penCfg.effective_travel_feed}`;
+}
+
+async function loadPen() {
+    penCfg = await apiGet("/api/pen");
+    renderPen();
+}
+
+document.getElementById("pen-use-z").addEventListener("click", () => {
+    document.getElementById("pen-table-z").value = latestState.z;
+});
+
+document.getElementById("pen-save").addEventListener("click", async () => {
+    const num = (id) => {
+        const v = document.getElementById(id).value.trim();
+        return v === "" ? null : parseFloat(v); // empty feed = clear to default
+    };
+    const body = {
+        table_z: num("pen-table-z"),
+        pen_up: num("pen-up"),
+        wrist: num("pen-wrist"),
+        feed: num("pen-feed"),
+        travel_feed: num("pen-travel-feed"),
+        pen_label: document.getElementById("pen-label").value.trim(),
+    };
+    const data = await apiPost("/api/pen", body);
+    if (data) {
+        penCfg = data;
+        renderPen();
+        showToast("Pen config saved", "success", 2000);
+    }
+});
+
+document.getElementById("pen-jog").addEventListener("click", async () => {
+    const btn = document.getElementById("pen-jog");
+    const body = {
+        center_x: parseFloat(document.getElementById("pen-jog-cx").value) || 250,
+        center_y: parseFloat(document.getElementById("pen-jog-cy").value) || 0,
+        cell: parseFloat(document.getElementById("pen-jog-cell").value) || 40,
+    };
+    btn.disabled = true; btn.textContent = "Jogging…";
+    const data = await apiPost("/api/pen/jog-corners", body);
+    btn.disabled = false; btn.textContent = "Jog corners";
+    if (data) showToast("Grid corners visited — footprint OK", "success", 2500);
+});
+
 // ── Activities ──────────────────────────────────────────────────────
 
 let activitiesMeta = [];
@@ -464,7 +525,8 @@ document.getElementById("shapes-draw").addEventListener("click", async () => {
         center_x: parseFloat(document.getElementById("shapes-cx").value) || 250,
         center_y: parseFloat(document.getElementById("shapes-cy").value) || 0,
     };
-    window.trace?.configure(0, 20); // draw-shapes uses default pen geometry
+    // draw-shapes loads the persisted pen geometry server-side; mirror it here.
+    window.trace?.configure(penCfg?.table_z ?? 0, penCfg?.pen_up ?? 20);
     btn.disabled = true; btn.textContent = "Drawing…";
     await apiPost("/api/activities/draw-shapes/run", options);
     btn.disabled = false; btn.textContent = "Draw";
@@ -476,3 +538,4 @@ connectControlWs();
 refreshRecordings();
 loadCalibration();
 loadActivities();
+loadPen();

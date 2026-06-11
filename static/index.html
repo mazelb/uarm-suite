@@ -116,6 +116,32 @@
                 <button id="goto-btn" class="action-btn">Go</button>
             </div>
 
+            <!-- Pen / drawing config -->
+            <div class="section">
+                <div class="section-title">Pen</div>
+                <div class="pen-config">
+                    <label>Table Z <input type="number" id="pen-table-z" value="0" step="0.5"></label>
+                    <label>Lift <input type="number" id="pen-up" value="20" step="1"></label>
+                    <label>Wrist <input type="number" id="pen-wrist" value="0" step="1"></label>
+                    <label>Pen <input type="text" id="pen-label" placeholder="unlabeled"></label>
+                    <label>Feed <input type="number" id="pen-feed" step="5" min="1" placeholder="default"></label>
+                    <label>Travel <input type="number" id="pen-travel-feed" step="5" min="1" placeholder="default"></label>
+                </div>
+                <div class="pen-hint">Feeds in mm/s; empty = suite default. Jog Z onto the paper, then:</div>
+                <div class="pen-actions">
+                    <button id="pen-use-z" class="cal-sm-btn" title="Copy the live Z into Table Z">Use current Z</button>
+                    <button id="pen-save" class="action-btn">Save</button>
+                </div>
+                <div class="section-title" style="margin-top:8px">Grid dry-run</div>
+                <div class="pen-config">
+                    <label>cX <input type="number" id="pen-jog-cx" value="250" step="1"></label>
+                    <label>cY <input type="number" id="pen-jog-cy" value="0" step="1"></label>
+                    <label>cell <input type="number" id="pen-jog-cell" value="40" step="1"></label>
+                </div>
+                <button id="pen-jog" class="action-btn" style="margin-top:4px"
+                        title="Visit the four grid corners at pen-up height — no stroke drawn">Jog corners</button>
+            </div>
+
             <!-- Workspace toggle -->
             <div class="section">
                 <div class="section-title">Workspace</div>
