@@ -429,11 +429,13 @@ function updateActivityUI() {
     const a = currentActivity();
     const isTTT = a && a.slug === "tic-tac-toe";
     const isShapes = a && a.slug === "draw-shapes";
+    const isText = a && a.slug === "draw-text";
     document.getElementById("activity-desc").textContent = a ? a.description : "";
     document.getElementById("ttt-widget").style.display = isTTT ? "block" : "none";
     document.getElementById("shapes-widget").style.display = isShapes ? "block" : "none";
+    document.getElementById("text-widget").style.display = isText ? "block" : "none";
     // Generic Run button only for non-interactive activities without a custom widget.
-    const generic = a && !a.interactive && !isShapes;
+    const generic = a && !a.interactive && !isShapes && !isText;
     document.getElementById("activity-run").style.display = generic ? "block" : "none";
     if (isTTT) renderBoard(_emptyState());
 }
@@ -530,6 +532,27 @@ document.getElementById("shapes-draw").addEventListener("click", async () => {
     btn.disabled = true; btn.textContent = "Drawing…";
     await apiPost("/api/activities/draw-shapes/run", options);
     btn.disabled = false; btn.textContent = "Draw";
+});
+
+// ── Draw-text ───────────────────────────────────────────────────────
+
+document.getElementById("text-draw").addEventListener("click", async () => {
+    const btn = document.getElementById("text-draw");
+    const text = document.getElementById("text-msg").value;
+    if (!text.trim()) {
+        showToast("Enter a message to write");
+        return;
+    }
+    const options = {
+        text,
+        size: parseFloat(document.getElementById("text-size").value) || 30,
+        center_x: parseFloat(document.getElementById("text-cx").value) || 250,
+        center_y: parseFloat(document.getElementById("text-cy").value) || 0,
+    };
+    window.trace?.configure(penCfg?.table_z ?? 0, penCfg?.pen_up ?? 20);
+    btn.disabled = true; btn.textContent = "Writing…";
+    await apiPost("/api/activities/draw-text/run", options);
+    btn.disabled = false; btn.textContent = "Write";
 });
 
 // ── Init ────────────────────────────────────────────────────────────

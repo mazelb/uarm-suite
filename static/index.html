@@ -68,6 +68,18 @@
                     </div>
                     <button id="shapes-draw" class="action-btn" style="margin-top:4px">Draw</button>
                 </div>
+
+                <!-- Draw-text widget -->
+                <div id="text-widget" style="display:none; margin-top:8px">
+                    <input type="text" id="text-msg" class="text-msg" value="HI!" maxlength="20"
+                           placeholder="A-Z 0-9 .,-+!?:' and space">
+                    <div class="text-config">
+                        <label>Size <input type="number" id="text-size" value="30" step="1" min="5"></label>
+                        <label>cX <input type="number" id="text-cx" value="250" step="1"></label>
+                        <label>cY <input type="number" id="text-cy" value="0" step="1"></label>
+                    </div>
+                    <button id="text-draw" class="action-btn" style="margin-top:4px">Write</button>
+                </div>
             </div>
 
             <!-- Joint sliders -->

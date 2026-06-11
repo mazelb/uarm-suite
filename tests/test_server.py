@@ -255,6 +255,16 @@ def test_activities_list(client: TestClient) -> None:
     assert slugs["tic-tac-toe"]["interactive"] is True
 
 
+def test_draw_text_run_and_bad_text_422(client: TestClient) -> None:
+    resp = client.post("/api/activities/draw-text/run", json={"text": "HI", "size": 20.0})
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "done"
+    # Unsupported characters surface as a clean 422, not a 500.
+    resp = client.post("/api/activities/draw-text/run", json={"text": "héllo"})
+    assert resp.status_code == 422
+    assert "unsupported character" in resp.json()["error"]
+
+
 def test_tic_tac_toe_start_and_move(client: TestClient) -> None:
     resp = client.post("/api/activities/tic-tac-toe/start", json={})
     assert resp.status_code == 200

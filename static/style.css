@@ -554,6 +554,7 @@ select.cal-input {
 
 .ttt-config,
 .shapes-config,
+.text-config,
 .pen-config {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -565,6 +566,8 @@ select.cal-input {
 .ttt-config input,
 .shapes-config input,
 .shapes-config select,
+.text-config input,
+.text-msg,
 .pen-config input {
     width: 100%;
     background: #222;
@@ -648,4 +651,17 @@ select.cal-input {
 .pen-actions .action-btn {
     flex: 1;
     margin-top: 0;
+}
+
+.text-config {
+    grid-template-columns: 1fr 1fr 1fr;
+}
+
+.text-msg {
+    width: 100%;
+    margin-bottom: 4px;
+    padding: 3px 4px;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
 }

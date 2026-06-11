@@ -347,6 +347,9 @@ def activity_run(
             typer.echo(f"{slug} complete.")
     except (WorkspaceError, JointLimitError) as exc:
         _handle_arm_error(exc)
+    except ValueError as exc:  # bad activity option (unknown shape, bad text)
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=1) from None
     finally:
         arm.disconnect()
 

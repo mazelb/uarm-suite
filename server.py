@@ -436,7 +436,9 @@ async def api_activity_run(slug: str, cmd: ActivityStart):
 
     try:
         await asyncio.to_thread(_run)
-    except (WorkspaceError, JointLimitError) as exc:
+    except (WorkspaceError, JointLimitError, ValueError) as exc:
+        # ValueError covers bad activity options (unknown shape, unsupported
+        # text characters) — a clean 422, not a 500.
         return JSONResponse(status_code=422, content={"error": str(exc)})
     return {"status": "done", "slug": slug}
 
