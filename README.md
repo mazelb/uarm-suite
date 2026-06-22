@@ -52,10 +52,14 @@ mount offset is absorbed into Z calibration. See `docs/walkthroughs/phase7.md`.
 
 ### Components
 
-- Raspberry Pi 4 (any RAM variant)
+- Raspberry Pi 4 (any RAM variant). Also works on older boards — a Pi 2 Model B
+  v1.1 was used for bring-up (ARMv7, 32-bit Pi OS, Ethernet/headless).
 - Adafruit PCA9685 16-channel PWM/servo driver
-- uArm Swift (first-generation, servo-based)
-- 5V 4A+ power supply for servos (do NOT power servos from the Pi)
+- uArm Swift (first-generation, servo-based). Its servos are 4-wire feedback
+  servos: a standard 3-wire plug (signal/V+/GND) plus a separate analog-feedback
+  wire that we leave disconnected (the PCA9685 can't read it).
+- 6V 5A+ power supply for servos — factory uArm Swift spec is **6V 5A** (do NOT
+  power servos from the Pi). 5V works but underdrives the servos.
 - 4x jumper wires for I2C
 
 ### Wiring
@@ -68,7 +72,7 @@ Connect the PCA9685 to the Raspberry Pi's I2C bus:
 | GND         | Pin 6 (GND)      | Ground             |
 | SDA         | Pin 3 (GPIO 2)   | I2C data           |
 | SCL         | Pin 5 (GPIO 3)   | I2C clock          |
-| V+          | External 5V PSU  | Servo power (4A+)  |
+| V+          | External 6V PSU  | Servo power (5A+)  |
 
 Connect the uArm Swift servos to PCA9685 channels:
 
@@ -97,8 +101,11 @@ sudo raspi-config  # Interface Options → I2C → Enable
 sudo i2cdetect -y 1
 # Should show device at address 0x40
 
-# Install CircuitPython libraries
-pip install adafruit-circuitpython-pca9685 adafruit-circuitpython-servokit
+# Install CircuitPython libraries + GPIO backend.
+# Blinka (>8.56) no longer auto-installs RPi.GPIO — add it explicitly.
+pip install adafruit-circuitpython-pca9685 adafruit-circuitpython-servokit RPi.GPIO
+# If RPi.GPIO misbehaves on the latest Pi OS (Bookworm), use the drop-in:
+#   pip uninstall RPi.GPIO && pip install rpi-lgpio
 
 # Clone and install
 git clone <repo-url> uarm-suite && cd uarm-suite

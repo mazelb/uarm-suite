@@ -104,9 +104,16 @@ cd uarm-suite
 curl -LsSf https://astral.sh/uv/install.sh | sh    # if not already installed
 # then, in the repo:
 uv sync                                             # runtime + dev deps
-# hardware driver libs (lazy-imported by PCA9685Bus):
-uv add adafruit-circuitpython-pca9685 adafruit-circuitpython-servokit
+# hardware driver libs (lazy-imported by PCA9685Bus) + GPIO backend:
+uv add adafruit-circuitpython-pca9685 adafruit-circuitpython-servokit RPi.GPIO
 ```
+
+> **`RPi.GPIO` is required and easy to miss.** Adafruit Blinka (>8.56) no longer
+> pulls it in automatically, so without it `UARM_MODE=hardware` dies with
+> `ModuleNotFoundError: No module named 'RPi'` the first time it opens the bus.
+> Use `uv add` (not bare `pip`) so `uv run`'s re-sync doesn't strip it back out.
+> If it errors at runtime on the latest Pi OS, swap to the drop-in:
+> `uv remove RPi.GPIO && uv add rpi-lgpio`.
 
 > **Plain-pip alternative** (piwheels serves prebuilt ARMv7 wheels, no source
 > builds): `python3 -m venv .venv && source .venv/bin/activate`, then
@@ -133,8 +140,8 @@ uv run uarm goto 200 0 50    # should report reaching the target
 |---|---|
 | Raspberry Pi (your Pi 2 Model B v1.1) | 32-bit Pi OS, I²C enabled |
 | Adafruit PCA9685 16-ch driver | I²C `0x40` default, 50 Hz PWM |
-| uArm Swift (1st-gen, servo) | **Verify the 4 servos are standard 3-wire PWM** (signal/V+/GND). If serial-bus, this whole approach changes. |
-| External servo PSU | **5–6 V, ≥6 A.** 4 metal-gear servos can spike under simultaneous load. **Never power servos from the Pi.** |
+| uArm Swift (1st-gen, servo) | **4-wire feedback servos** (see §5c). Standard 3-wire PWM (White=signal, Red=V+, Black=GND) in a 3-pin JST, plus a separate Orange analog-feedback wire we leave unconnected. |
+| External servo PSU | **6 V, ≥5 A** (factory uArm Swift spec is **6 V 5 A 30 W**). 5 V runs but underdrives. A 2 A supply browns out under load. **Never power servos from the Pi.** |
 | 4× F-F jumper wires | I²C: VCC, GND, SDA, SCL |
 | Barrel/screw-terminal pigtail | PSU into the PCA9685 V+/GND block |
 
@@ -184,12 +191,24 @@ Pi 40-pin header, top-left corner = Pin 1:
 
 ### 5c. Servos → PCA9685 output channels (one at a time)
 
-Each output is a 3-pin header. On the Adafruit board the rows are
-**GND (bottom) / V+ (middle) / PWM-signal (top)**:
+**These are 4-wire uArm feedback servos (verified on this arm):**
 
-- Signal (yellow/white) → **top**
-- V+ (red) → **middle**
-- GND (brown/black) → **bottom**
+| Wire | Function | Where it goes |
+|---|---|---|
+| **Red** | V+ | middle of the 3-pin JST plug |
+| **Black** | GND | one end of the 3-pin plug |
+| **White** | PWM signal | other end of the 3-pin plug |
+| **Orange** (separate single JST) | analog feedback (pot wiper) | **NOT connected** — tape it off |
+
+*Verified with a multimeter:* resistance Orange↔Black sweeps smoothly as the
+joint is rotated by hand (pot wiper); White does not. Red=V+/Black=GND by
+universal convention (power is the center pin of the 3-pin plug).
+
+The White/Black/Red 3-pin JST is a standard servo plug and seats directly on the
+PCA9685's 3-pin channel header. On the Adafruit board the rows are
+**GND (bottom) / V+ (middle) / PWM-signal (top)** — orient the plug so **Black
+lands on the GND row**. Confirm the GND pin first with the meter's continuity
+(beep) mode against the board's GND (it's common with the Pi-GND jumper).
 
 | Channel | Joint | Servo |
 |---|---|---|
@@ -218,9 +237,11 @@ PCA9685 outputs zero duty and the servos are **limp — support the arm by hand.
 sudo i2cdetect -y 1
 ```
 
-Expect a device at **`40`** in the grid. If absent: re-check the 4 I²C jumpers
-and that VCC↔Pin 1, GND↔Pin 6, SDA↔Pin 3, SCL↔Pin 5 (a swapped SDA/SCL is the
-classic miss).
+Expect a device at **`40`** in the grid. You'll usually also see **`70`** — that's
+the PCA9685's "All-Call" address (the same chip answering a second address),
+not a second device. Both are normal. If `40` is absent: re-check the 4 I²C
+jumpers and that VCC↔Pin 1, GND↔Pin 6, SDA↔Pin 3, SCL↔Pin 5 (a swapped SDA/SCL
+is the classic miss).
 
 ✅ **Gate:** nothing moves until `0x40` shows here.
 
@@ -288,3 +309,41 @@ and `drawing.json` are per-machine and gitignored — this table is the durable 
 | `H_BASE` / `L1` / `L2` / `L_TOOL` (measured) | | mm |
 | Pen `table_z` (per pen) | | mm; label the pen |
 | `feed` / `travel_feed` | | mm/s |
+
+---
+
+## 9. Bring-up findings (observed live, first power-on)
+
+Real gotchas hit during the first hardware bring-up — check these before
+re-deriving them:
+
+1. **`RPi.GPIO` missing** → `ModuleNotFoundError: No module named 'RPi'` on the
+   first `UARM_MODE=hardware` command. Blinka stopped auto-installing it. Fix in
+   §3 (`uv add RPi.GPIO`).
+2. **Servo power is the most likely "nothing moves" cause.** I²C and commands
+   work off the Pi's 3.3 V, so the arm can pass `i2cdetect` and accept commands
+   while the servos sit dead for lack of V+. Always confirm **~6 V across the
+   PCA9685 V+/GND terminals** with a meter before suspecting software.
+3. **The CLI is transient — use the server to actually drive.** `uarm joints …`
+   writes the pose then exits, and `close()` zeros every channel on the way out,
+   so servos barely twitch. For real motion run the **persistent server**
+   (`UARM_MODE=hardware uv run python server.py`); its 50 Hz tick streams PWM
+   continuously so servos hold and move. The server **auto-homes on startup**
+   (slow-home 30°/s) — that first motion is expected; keep a hand on the arm.
+4. **Trust a known-good meter.** A flaky meter / broken probe lead produced
+   false `0 V` readings that looked like dead PSUs. Sanity-check the meter on a
+   AA battery (~1.5 V) and by shorting the probes (continuity beeps) before
+   trusting any reading.
+5. **Undersized PSU browns out.** A 5 V 2 A adapter is ~4× too small; it may
+   gently move one servo but sags/resets under multi-servo load. Use 6 V ≥5 A.
+6. **All four servo directions came out reversed** (`direction = -1`) on this
+   arm — normal; the servo horns are mounted opposite to the code's positive
+   convention. Flip each joint to **0** first (servo center, the pivot), *then*
+   set `direction = -1`, so the flip causes no swing. J3 (wrist) direction can
+   wait until a pen is mounted (it doesn't affect tool-tip XYZ).
+7. **"Model looks wrong" was uncalibrated zeros, not a viz bug.** `viz.js`
+   renders the documented convention correctly (upper arm at j1, forearm at
+   absolute j2, tool held horizontal). When the real arm tracks direction but
+   sits at different *angles*, that's the unset `zero_deg`/pulse-range — calibrate
+   against **real-world references** (joint 0 = upper arm horizontal, forearm
+   horizontal, base straight forward), not against the on-screen model.
