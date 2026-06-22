@@ -1,5 +1,17 @@
 # Phase 7 hardware bring-up — tic-tac-toe on the real arm
 
+> ⚠️ **SUPERSEDED — do not follow this for hardware setup.** Use
+> [`phase9-hardware-setup.md`](phase9-hardware-setup.md), the current
+> self-contained bring-up guide, corrected against the real arm and the official
+> UFACTORY spec. Facts in *this* file are now **stale**:
+> - servos run on **6 V** (not 5 V),
+> - they're **4-wire feedback servos** — a 3-wire signal/V+/GND plug **plus a
+>   separate analog-feedback wire that stays disconnected** (not plain 3-wire),
+> - **`RPi.GPIO` must be installed** or `UARM_MODE=hardware` fails on import.
+>
+> This file is kept only for its Phase 7 tic-tac-toe framing and the
+> fresh-session prompt.
+
 Guide for taking the (sim-validated) Phase 7 tic-tac-toe activity onto the
 physical uArm Swift. Contains a fresh-session prompt and the hardware + wiring
 reference.

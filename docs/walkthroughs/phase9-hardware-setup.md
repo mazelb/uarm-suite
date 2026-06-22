@@ -11,10 +11,9 @@ The complete, first-timer-friendly bring-up guide. Written for a setup where:
 - The arm is a first-gen uArm Swift (servo-based) driven via an Adafruit
   **PCA9685** 16-channel PWM driver at I²C `0x40`.
 
-> This doc is the standalone reference. The original wiring table and the
-> staged power-on script also live in
-> [`phase7-hardware.md`](phase7-hardware.md); the wiring is identical. The
-> session plan / order of operations is
+> This doc is the **authoritative, self-contained** hardware reference and
+> supersedes [`phase7-hardware.md`](phase7-hardware.md) (kept only for its
+> Phase 7 tic-tac-toe framing). The session plan / order of operations is
 > [`docs/prompts/phase9_kickoff.md`](../prompts/phase9_kickoff.md).
 
 > **Safety rules in force (CLAUDE.md 7–9):** slow-home (≤30°/s) is always the
