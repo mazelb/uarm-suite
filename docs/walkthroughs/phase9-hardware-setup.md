@@ -219,7 +219,8 @@ lands on the GND row**. Confirm the GND pin first with the meter's continuity
 | 5 | GRIPPER | reserved — leave empty |
 
 Unsure which physical servo is which joint? Wire your best guess —
-**Stage 1 (§7) verifies and corrects channel↔joint + direction.** Don't assume.
+**Stage 1 (§8) verifies and corrects channel↔joint + direction** (see the
+calibration model in §7). Don't assume.
 
 ### 5d. PCA9685 address
 
@@ -256,7 +257,101 @@ UARM_MODE=mock UARM_MOCK_VERBOSE=1 uv run uarm goto 250 0 50
 
 ---
 
-## 7. Staged bring-up (announce each move, then observe)
+## 7. Servo calibration — the mental model (the part that's easy to get wrong)
+
+We lost real time to this during the first bring-up. Read it before Stage 1.
+
+### Two independent layers — don't conflate them
+
+1. **Calibration** (`zero_deg`, `direction`, `min_us`/`max_us`, per channel in
+   `calibration.json`) is the **joint → servo translation**: *"when I command
+   J1 = 30°, what PWM pulse puts the real servo there?"* It is unique to **your**
+   arm because it depends on where each servo horn happened to land on its spline.
+   Calibration does **not** restrict motion.
+2. **Limits** (`J*_LIMITS` + the parallelogram rule `j2 > 2·j1 − 180` in
+   `config.py`) are **guard rails on what you're allowed to command**. They are
+   convention-level estimates, the same for any arm of this design, and know
+   **nothing** about your calibration.
+
+They stack, they don't conflict: calibration says *how* to reach an angle; limits
+say *whether you may ask*. A toast that fires "too early" is a limits problem
+(§7, last part), not a calibration problem.
+
+### What `joint = 0` means physically (the reference poses)
+
+The IK/FK math measures **J1 and J2 as absolute angles from horizontal**. So the
+physical arm *must* agree, or every `goto` and every drawn line is off by the
+error. `joint = 0` is **defined** as:
+
+| Joint | `joint = 0` is physically… |
+|---|---|
+| **J0** base | arm pointing **straight forward** (along +X) |
+| **J1** upper arm | upper-arm link **horizontal** (parallel to the table) |
+| **J2** forearm | forearm link **horizontal** |
+| **J3** wrist | wrist **centered** |
+
+`zero_deg` is simply **the servo angle that lands the arm on that reference.**
+Calibrating the zero = find that servo value. In the web UI you do it indirectly:
+adjust `zero_deg` until clicking **Jn → 0** puts the segment exactly on its
+reference (a phone level app makes "horizontal" exact).
+
+### The three knobs
+
+- **`direction`** (`+1`/`−1`) — flips the joint's sense. Symptom of wrong value:
+  the joint moves **opposite** to the model/reference. Flip it. *(On this arm all
+  four came out `−1`… except where re-zeroing changed the story — verify yours.)*
+- **`zero_deg`** — the servo angle for `joint = 0`. Symptom of wrong value: a
+  **constant offset** (see diagnosis below).
+- **`min_us`/`max_us`** — the pulse range mapping servo 0°–180° (default
+  500–2500). Symptom of wrong value: angles **drift more the further from zero**
+  you go (a scale error).
+
+### Diagnosing a mismatch — the decomposition that cracks it
+
+Command a joint to **0**, then to **45**, and compare the real arm to the model:
+
+| What you see | Cause | Fix |
+|---|---|---|
+| Real moves **opposite** to model | `direction` wrong | flip `direction` |
+| Real is off by the **same amount at 0 and 45** (constant offset) | `zero_deg` wrong | shift `zero_deg` by that offset |
+| Real **matches at 0 but drifts** by 45 (error grows) | scale wrong | adjust `min_us`/`max_us` |
+| A **different joint moves** when you command this one | mechanical coupling not modeled | stop, investigate |
+
+Worked example from this arm: J1→0 gave a real **45°** and J1→45 gave a real
+**90°** — a *constant* +45° (same at both), forearm unmoved. That's a pure
+**zero** error: `servo = zero_deg + j1`, real = `servo − 75`, so true horizontal
+is servo **75**, i.e. `zero_deg = 75` (it had been mis-set to 120). Dropping it to
+75 fixed it *and* recovered range (clamps at j1≈105 instead of 60).
+
+### Procedure (per joint, J0 → J1 → J2; hand under the arm for J1/J2)
+
+1. **Direction:** **Jn → 0**, then **Jn → +45**. Right way? (J0 +45 swings left;
+   J1 +45 up; J2 +45 wrist-end rises.) If not, flip `direction`, re-test.
+2. **Zero:** **Jn → 0**. Nudge `zero_deg` until the segment sits exactly on its
+   reference (J0 forward, J1/J2 horizontal).
+3. **Scale:** the calibration panel only has **0 / +45 / −45** buttons — to test
+   bigger angles use the **joint sliders** in the Controls panel. Drag J1 up: it
+   should reach **vertical at 90**. If it under/overshoots, adjust `min_us`/`max_us`.
+4. **Save** (writes `calibration.json` — **unsaved values reset on restart**, and
+   the server re-homes to defaults, which looks like "calibration did nothing").
+
+J3 (wrist) direction can wait until a pen is mounted — it doesn't affect tool-tip
+XYZ.
+
+### Then reconcile the limits (don't leave them as estimates)
+
+Once zeros are true, your real reachable range is a **consequence** of
+calibration: a servo only spans 0–180°, and `_write_pwm` **clamps to that range
+silently**. If `J*_LIMITS` is looser than the real range, commands clamp without
+warning (violating "never silently clamp"); if tighter, you get toasts before the
+arm's real stop. So **measure** each joint's real safe range (jog gently toward
+each stop, back off a few degrees — never ram it) and set `J*_LIMITS` to match.
+The parallelogram rule `j2 > 2·j1 − 180` is **real physics** (the linkage can't
+fold through itself), not an estimate — leave it.
+
+---
+
+## 8. Staged bring-up (announce each move, then observe)
 
 Run from the Pi (in the venv). Each stage pauses for the operator's report of
 what the arm physically did before advancing.
@@ -269,7 +364,8 @@ what the arm physically did before advancing.
   Open `http://uarm.local:8000` from your laptop. Use the **calibration panel**
   per-joint test buttons (J@0 / +45 / −45) to confirm each servo moves the right
   joint in the right direction. Set `direction` / `zero_deg` / `min_us` /
-  `max_us` and **Save** → `calibration.json`.
+  `max_us` and **Save** → `calibration.json`. **Follow the calibration model and
+  diagnosis table in §7** — direction vs zero vs scale are distinct fixes.
 - **STAGE 2 — Home + dry motion:** `home` (slow-home 30°/s, **first motion**),
   then a few `goto` targets at **safe height** well above the table; confirm the
   3D viz matches reality. Fix IK/calibration sign issues here.
@@ -294,7 +390,7 @@ what the arm physically did before advancing.
 
 ---
 
-## 8. Tuned values to record here (fill in during bring-up)
+## 9. Tuned values to record here (fill in during bring-up)
 
 Capture these as you go so re-rigging later is repeatable. (`calibration.json`
 and `drawing.json` are per-machine and gitignored — this table is the durable copy.)
@@ -311,7 +407,7 @@ and `drawing.json` are per-machine and gitignored — this table is the durable 
 
 ---
 
-## 9. Bring-up findings (observed live, first power-on)
+## 10. Bring-up findings (observed live, first power-on)
 
 Real gotchas hit during the first hardware bring-up — check these before
 re-deriving them:

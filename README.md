@@ -112,6 +112,17 @@ git clone <repo-url> uarm-suite && cd uarm-suite
 uv sync
 ```
 
+### Servo calibration
+
+Per-servo calibration (`zero_deg` / `direction` / `min_us` / `max_us`, persisted
+to `calibration.json`) maps **logical joint angles → servo PWM** and is unique to
+each arm. `joint = 0` is defined physically — **J1/J2 horizontal, J0 forward** —
+and the IK measures J1/J2 as absolute angles from horizontal, so getting the
+zeros right is what makes the 3D model and the real arm agree. For the full
+mental model, the direction-vs-zero-vs-scale diagnosis table, and how calibration
+relates to (separate) joint limits, see
+[`docs/walkthroughs/phase9-hardware-setup.md` §7](docs/walkthroughs/phase9-hardware-setup.md).
+
 ### Running on hardware
 
 ```bash
