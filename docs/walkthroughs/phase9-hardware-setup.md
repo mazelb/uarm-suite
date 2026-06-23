@@ -395,15 +395,20 @@ what the arm physically did before advancing.
 Capture these as you go so re-rigging later is repeatable. (`calibration.json`
 and `drawing.json` are per-machine and gitignored — this table is the durable copy.)
 
+**Recorded at first bring-up** (Pi 2 Model B v1.1; temporary 5 V 2 A supply —
+replace with 6 V ≥5 A). Servo zeros calibrated to physical references
+(J1/J2 horizontal, J0 forward); `min_us`/`max_us` left at defaults (scale
+verified roughly correct). Geometry, pen Z, and feeds still to be measured.
+
 | What | Value | Notes |
 |---|---|---|
-| Servo 0 (J0) zero_deg / dir / min_us / max_us | | |
-| Servo 1 (J1) zero_deg / dir / min_us / max_us | | |
-| Servo 2 (J2) zero_deg / dir / min_us / max_us | | |
-| Servo 3 (J3) zero_deg / dir / min_us / max_us | | |
-| `H_BASE` / `L1` / `L2` / `L_TOOL` (measured) | | mm |
-| Pen `table_z` (per pen) | | mm; label the pen |
-| `feed` / `travel_feed` | | mm/s |
+| Servo 0 (J0) zero_deg / dir / min_us / max_us | **90 / −1 / 500 / 2500** | base centered |
+| Servo 1 (J1) zero_deg / dir / min_us / max_us | **75 / +1 / 500 / 2500** | was mis-set to 120; 75 = true horizontal, also better range |
+| Servo 2 (J2) zero_deg / dir / min_us / max_us | **20 / −1 / 500 / 2500** | re-zeroed from 93 |
+| Servo 3 (J3) zero_deg / dir / min_us / max_us | **90 / −1 / 500 / 2500** | wrist centered |
+| `H_BASE` / `L1` / `L2` / `L_TOOL` (measured) | _TBD_ | still config.py estimates (80 / 142 / 158 / 56 mm) |
+| Pen `table_z` (per pen) | _TBD_ | mm; label the pen |
+| `feed` / `travel_feed` | _TBD_ | mm/s |
 
 ---
 
